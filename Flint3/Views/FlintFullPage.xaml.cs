@@ -158,8 +158,8 @@ namespace Flint3.Views
             {
                 NewFeatureButton.Visibility = Visibility.Collapsed;
 
-                var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                if (localSettings.Values["firstRunV300Teaching"] == null)
+                var localSettings = MainViewModel.Instance.AppSettings;
+                if (localSettings.GetValue("firstRunV300Teaching") == null)
                 {
                     NewFeatureButton.Visibility = Visibility.Visible;
                 }
@@ -171,8 +171,8 @@ namespace Flint3.Views
         {
             try
             {
-                var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                localSettings.Values["firstRunV300Teaching"] = true;
+                var localSettings = MainViewModel.Instance.AppSettings;
+                localSettings.SetValue("firstRunV300Teaching", true);
                 NewFeatureButton.Visibility = Visibility.Collapsed;
                 FirstTeachingTip.IsOpen = false;
                 SecondTeachingTip.IsOpen = false;

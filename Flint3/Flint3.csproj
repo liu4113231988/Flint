@@ -5,9 +5,9 @@
         <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
         <RootNamespace>Flint3</RootNamespace>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <Platforms>x64;ARM64</Platforms>
+        <Platforms>x64</Platforms>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+        <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
         <PublishProfile>win-$(Platform).pubxml</PublishProfile>
         <Nullable>enable</Nullable>
         <UseWinUI>true</UseWinUI>
@@ -19,19 +19,7 @@
         <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
         <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
         <SelfContained>true</SelfContained>
-        <EnableMsixTooling>true</EnableMsixTooling>
-        <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-        <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-        <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-        <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
-        <AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
-        <GenerateTestArtifacts>True</GenerateTestArtifacts>
-        <AppxBundle>Always</AppxBundle>
-        <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-        <AppxBundlePlatforms>x64</AppxBundlePlatforms>
-        <AppxPackageDir>C:\Users\Shock Jockey\Desktop\x64\</AppxPackageDir>
-        <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
-        <PackageCertificateKeyFile>Flint3_TemporaryKey.pfx</PackageCertificateKeyFile>
+        <WindowsPackageType>None</WindowsPackageType>
     </PropertyGroup>
     <ItemGroup>
         <None Remove="Assets\flint_logo_background_dark.png" />
@@ -91,7 +79,9 @@
         <None Remove="Views\SettingsPage.xaml" />
     </ItemGroup>
     <ItemGroup>
-        <Content Include="Data\stardict.db" />
+        <Content Include="Data\stardict.db">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>
@@ -110,14 +100,6 @@
         <Manifest Include="$(ApplicationManifest)" />
     </ItemGroup>
 
-    <!-- 
-    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
-    Tools extension to be activated for this project even if the Windows App SDK Nuget
-    package has not yet been restored.
-  -->
-    <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-        <ProjectCapability Include="Msix" />
-    </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Flint3.Data\Flint3.Data.csproj" />
         <ProjectReference Include="..\Flint3.Interop\Flint3.Interop.vcxproj" />
@@ -190,13 +172,4 @@
             <Generator>MSBuild:Compile</Generator>
         </Page>
     </ItemGroup>
-
-    <!-- 
-    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution 
-    Explorer "Package and Publish" context menu entry to be enabled for this project even if 
-    the Windows App SDK Nuget package has not yet been restored.
-  -->
-    <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-        <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
-    </PropertyGroup>
 </Project>

@@ -22,7 +22,17 @@ namespace Flint3.Helpers
         {
             if (DataFolder == null)
             {
-                DataFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(DataFolderName, CreationCollisionOption.OpenIfExists);
+                try
+                {
+                    DataFolder = await Microsoft.Windows.Storage.ApplicationData.GetDefault().LocalFolder.CreateFolderAsync(DataFolderName, CreationCollisionOption.OpenIfExists);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine(ex);
+                    string folderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Flint3", DataFolderName);
+                    Directory.CreateDirectory(folderPath);
+                    DataFolder = await StorageFolder.GetFolderFromPathAsync(folderPath);
+                }
             }
             return DataFolder;
         }
