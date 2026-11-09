@@ -1,16 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Flint3.Core.Query;
 using Flint3.Data;
 using Flint3.Data.Models;
+using Flint3.Data.Sources;
 
 namespace Flint3.ViewModels
 {
     public partial class MainViewModel : ObservableObject
     {
+        private const int SearchDebounceMilliseconds = 300;
+
         [System.Text.RegularExpressions.GeneratedRegex(@"[^\w]*")]
         private static partial System.Text.RegularExpressions.Regex WordSearchRegex();
+
+        private readonly WordQueryService _wordQueryService = new(new IWordSource[] { new EcdictSource() });
+
+        private readonly SearchCoordinator _searchCoordinator = new();
 
         /// <summary>
         /// 查词结果
@@ -32,38 +41,82 @@ namespace Flint3.ViewModels
         }
 
         /// <summary>
-        /// 查找模糊匹配的多个单词
+        /// 查找模糊匹配的多个单词：新输入会取消上一次请求，延迟 300ms 后只保留最后一次结果
         /// </summary>
         /// <param name="word"></param>
-        public async void MatchWord(string word, bool searchingFromMain, int limit = 10)
+        public void MatchWord(string word, bool searchingFromMain, int limit = 10)
+        {
+            ObservableCollection<StarDictWordItem> wordsCollection = searchingFromMain ? this.SearchResultWordItems : this.LiteSearchResultWordItems;
+            SearchRequest request = _searchCoordinator.BeginRequest();
+
+            if (string.IsNullOrWhiteSpace(word))
+            {
+                wordsCollection.Clear();
+                return;
+            }
+
+            _ = SearchWordAsync(WordSearchRegex().Replace(word, ""), wordsCollection, limit, request);
+        }
+
+        private async Task SearchWordAsync(string word, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request)
         {
             try
             {
-                var wordsCollection = searchingFromMain ? this.SearchResultWordItems : this.LiteSearchResultWordItems;
+                await Task.Delay(SearchDebounceMilliseconds, request.Token);
+
+                IReadOnlyList<WordEntry> entries = await _wordQueryService.MatchAsync(word, limit, request.Token);
+                request.Token.ThrowIfCancellationRequested();
+
+                PublishResults(wordsCollection, entries, request.Sequence);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+        }
+
+        /// <summary>
+        /// 切回 UI 线程并再次校验序号，避免旧请求覆盖新结果
+        /// </summary>
+        private void PublishResults(ObservableCollection<StarDictWordItem> wordsCollection, IReadOnlyList<WordEntry> entries, long sequence)
+        {
+            void Apply()
+            {
+                if (!_searchCoordinator.IsCurrent(sequence))
+                {
+                    return;
+                }
 
                 wordsCollection.Clear();
-                if (string.IsNullOrWhiteSpace(word)) return;
-
-                word = WordSearchRegex().Replace(word, "");
-
-                var results = await StarDictDataAccess.MatchWord(word, limit);
-                if (results != null)
+                foreach (WordEntry entry in entries)
                 {
-                    foreach (StarDictWordItem item in results)
-                    {
-                        var wordItem = MakeupWordItem(item);
-                        if (wordItem?.Word == word)
-                        {
-                            wordsCollection.Insert(0, wordItem);
-                        }
-                        else
-                        {
-                            wordsCollection.Add(wordItem);
-                        }
-                    }
+                    wordsCollection.Add(MakeupWordItem(entry));
                 }
             }
-            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+
+            if (this.Dispatcher is null)
+            {
+                Apply();
+                return;
+            }
+
+            this.Dispatcher.TryEnqueue(Apply);
+        }
+
+        /// <summary>
+        /// 将查询结果转换为界面展示的数据类型
+        /// </summary>
+        private StarDictWordItem MakeupWordItem(WordEntry entry)
+        {
+            return MakeupWordItem(new StarDictWordItem
+            {
+                Id = entry.Id,
+                Word = entry.Word,
+                StripWord = entry.StripWord,
+                Phonetic = entry.Phonetic,
+                Definition = entry.Definition,
+                Translation = entry.Translation,
+                Exchange = entry.Exchange,
+                Source = entry.Source
+            });
         }
 
         /// <summary>
@@ -80,89 +133,18 @@ namespace Flint3.ViewModels
                     item.Definition = string.Empty;
                 }
 
-                if (!string.IsNullOrWhiteSpace(item.Exchange))
+                IReadOnlyList<WordExchange> exchanges = ExchangeParser.Parse(item.Exchange);
+                if (exchanges.Count > 0)
                 {
-                    string exchange = item.Exchange;
-                    string[] exchanges = exchange.Split('/');
-                    item.Exchanges = new List<WordExchangeItem>();
-                    string word = string.Empty;
-                    foreach (var exc in exchanges)
+                    item.Exchanges = new List<WordExchangeItem>(exchanges.Count);
+                    foreach (WordExchange exchange in exchanges)
                     {
-                        if (exc.Contains("p:"))
-                        {
-                            word = exc.Replace("p:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "过去式"));
-                            }
-                        }
-                        else if (exc.Contains("d:"))
-                        {
-                            word = exc.Replace("d:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "过去分词"));
-                            }
-                        }
-                        else if (exc.Contains("i:"))
-                        {
-                            word = exc.Replace("i:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "现在分词"));
-                            }
-                        }
-                        else if (exc.Contains("3:"))
-                        {
-                            word = exc.Replace("3:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "第三人称单数"));
-                            }
-                        }
-                        else if (exc.Contains("r:"))
-                        {
-                            word = exc.Replace("r:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "比较级"));
-                            }
-                        }
-                        else if (exc.Contains("t:"))
-                        {
-                            word = exc.Replace("t:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "最高级"));
-                            }
-                        }
-                        else if (exc.Contains("s:"))
-                        {
-                            word = exc.Replace("s:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "复数"));
-                            }
-                        }
-                        else if (exc.Contains("0:"))
-                        {
-                            word = exc.Replace("0:", "");
-                            if (!string.IsNullOrWhiteSpace(word))
-                            {
-                                item.Exchanges.Add(new WordExchangeItem(word, "原型"));
-                            }
-                        }
-                        //else if (exc.Contains("1:"))
-                        //{
-                        //    word = 
-                        //    item.Exchanges.Add(new WordExchangeItem(exc.Replace("1:", ""), ""));
-                        //}
+                        item.Exchanges.Add(new WordExchangeItem(exchange.Word, exchange.Type));
                     }
-
-                    if (item.Exchanges.Count <= 0)
-                    {
-                        item.Exchanges = null;
-                    }
+                }
+                else
+                {
+                    item.Exchanges = null;
                 }
 
                 return item;

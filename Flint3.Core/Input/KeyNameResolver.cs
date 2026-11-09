@@ -20,7 +20,7 @@ namespace Flint3.Core.Input
 
         public string GetKeyName(uint key)
         {
-            return GetKeyName(key, PInvoke.GetKeyboardLayout(0));
+            return GetKeyName(key, Flint3CorePInvoke.GetKeyboardLayout(0));
         }
 
         public string GetKeyName(uint key, HKL layout)
@@ -55,8 +55,8 @@ namespace Flint3.Core.Input
 
             for (uint vk = 1; vk < 256; vk++)
             {
-                uint scanCode = PInvoke.MapVirtualKeyEx(vk, MAP_VIRTUAL_KEY_TYPE.MAPVK_VK_TO_VSC, layout);
-                int count = PInvoke.ToUnicodeEx(vk, scanCode, keyboardState, buffer, 3, NoKeyboardStateChange, layout);
+                uint scanCode = Flint3CorePInvoke.MapVirtualKeyEx(vk, MAP_VIRTUAL_KEY_TYPE.MAPVK_VK_TO_VSC, layout);
+                int count = Flint3CorePInvoke.ToUnicodeEx(vk, scanCode, keyboardState, buffer, 3, NoKeyboardStateChange, layout);
                 if (count != 0)
                 {
                     int length = 0;

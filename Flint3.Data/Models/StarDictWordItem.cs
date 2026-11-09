@@ -42,6 +42,11 @@ namespace Flint3.Data.Models
         /// </summary>
         public List<WordExchangeItem> Exchanges { get; set; } = [];
 
+        /// <summary>
+        /// 词条来源标记，如 Ecdict、Mdx:xxx
+        /// </summary>
+        public string Source { get; set; } = "";
+
         private string _description = "";
 
         /// <summary>

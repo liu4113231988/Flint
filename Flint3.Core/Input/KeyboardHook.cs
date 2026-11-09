@@ -57,7 +57,7 @@ namespace Flint3.Core.Input
                 return true;
             }
 
-            _hookHandle = PInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _hookProc, default(HINSTANCE), 0);
+            _hookHandle = Flint3CorePInvoke.SetWindowsHookEx(WINDOWS_HOOK_ID.WH_KEYBOARD_LL, _hookProc, default(HINSTANCE), 0);
             if (_hookHandle == default)
             {
                 Trace.WriteLine($"SetWindowsHookEx(WH_KEYBOARD_LL) failed: {Marshal.GetLastWin32Error()}");
@@ -82,14 +82,14 @@ namespace Flint3.Core.Input
 
                 if (_filter is not null && !_filter(ev))
                 {
-                    return PInvoke.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+                    return Flint3CorePInvoke.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
                 }
 
                 _callback(ev);
                 return new LRESULT(1);
             }
 
-            return PInvoke.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+            return Flint3CorePInvoke.CallNextHookEx(_hookHandle, nCode, wParam, lParam);
         }
 
         public void Dispose()
@@ -101,7 +101,7 @@ namespace Flint3.Core.Input
 
             if (_installed)
             {
-                PInvoke.UnhookWindowsHookEx(_hookHandle);
+                Flint3CorePInvoke.UnhookWindowsHookEx(_hookHandle);
                 lock (s_hookCallbacksLock)
                 {
                     s_hookCallbacks.Remove(_hookCallback);

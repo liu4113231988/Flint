@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -10,13 +10,13 @@ namespace Flint3.Data
 {
     public static class StarDictDataAccess
     {
-        private static SqliteConnection? _starDictDb = null;
-
         private static Task? _initializeTask = null;
 
         private static readonly object _initializeLock = new();
 
         private static string? _databasePath = null;
+
+        private static string DatabasePath => _databasePath ?? Path.Combine(AppContext.BaseDirectory, "Data", "stardict.db");
 
         /// <summary>
         /// 初始化数据库连接，可被重复调用；查询方法内部也会等待此任务完成
@@ -31,40 +31,10 @@ namespace Flint3.Data
                     _databasePath = databasePath;
                 }
 
-                if (_initializeTask is null)
-                {
-                    string path = _databasePath ?? Path.Combine(AppContext.BaseDirectory, "Data", "stardict.db");
-                    _starDictDb = new SqliteConnection($"Filename={path}");
-                    _initializeTask = _starDictDb.OpenAsync();
-                }
-
+                // 预热一条连接，失败不在这里抛出，交给具体查询处理
+                _initializeTask ??= WarmUpAsync(DatabasePath);
                 return _initializeTask;
             }
-
-            // 库结构参考（发布库已自带索引，见计划 D4）
-            //string tableCommand =
-            //    "CREATE TABLE IF NOT EXISTS stardict (" +
-            //        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE," +
-            //        "word VARCHAR(64) COLLATE NOCASE NOT NULL UNIQUE," +
-            //        "sw VARCHAR(64) COLLATE NOCASE NOT NULL," +
-            //        "phonetic VARCHAR(64)," +
-            //        "definition TEXT," +
-            //        "translation TEXT," +
-            //        "pos VARCHAR(16)," +
-            //        "collins INTEGER DEFAULT(0)," +
-            //        "oxford INTEGER DEFAULT(0)," +
-            //        "tag VARCHAR(64)," +
-            //        "bnc INTEGER DEFAULT(NULL)," +
-            //        "frq INTEGER DEFAULT(NULL)," +
-            //        "exchange TEXT," +
-            //        "detail TEXT," +
-            //        "audio TEXT);" +
-            //    "CREATE UNIQUE INDEX IF NOT EXISTS stardict_1 ON stardict(id);" +
-            //    "CREATE UNIQUE INDEX IF NOT EXISTS stardict_2 ON stardict(word);" +
-            //    "CREATE INDEX IF NOT EXISTS stardict_3 ON stardict(sw, word collate nocase);" +
-            //    "CREATE INDEX IF NOT EXISTS sd_1 ON stardict(word collate nocase); ";
-            //SqliteCommand createTable = new SqliteCommand(tableCommand, db);
-            //createTable.ExecuteReader();
         }
 
         public static void CloseDatabase()
@@ -73,45 +43,82 @@ namespace Flint3.Data
             {
                 lock (_initializeLock)
                 {
-                    _starDictDb?.Close();
-                    _starDictDb?.Dispose();
-                    _starDictDb = null;
                     _initializeTask = null;
                 }
+
+                // 每个查询独立连接，关闭时清空连接池以释放文件句柄
+                SqliteConnection.ClearAllPools();
             }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+        }
+
+        private static async Task WarmUpAsync(string path)
+        {
+            try
+            {
+                using SqliteConnection connection = new($"Filename={path}");
+                await connection.OpenAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+        }
+
+        /// <summary>
+        /// 每个查询使用独立连接（由 Microsoft.Data.Sqlite 连接池复用），避免共享连接并发冲突
+        /// </summary>
+        private static async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+        {
+            await InitializeDatabase().WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            SqliteConnection connection = new($"Filename={DatabasePath}");
+            try
+            {
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                return connection;
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+
+        private static StarDictWordItem ReadWordItem(SqliteDataReader reader)
+        {
+            return new StarDictWordItem
+            {
+                Id = reader.IsDBNull(0) ? -1 : reader.GetInt64(0),
+                Word = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                StripWord = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                Phonetic = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                Definition = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                Translation = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+                Exchange = reader.IsDBNull(12) ? string.Empty : reader.GetString(12)
+            };
         }
 
         /// <summary>
         /// 查找单词
         /// </summary>
         /// <param name="word">精确查找的单词文本</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>所有的完全匹配的单词</returns>
-        public static async Task<List<StarDictWordItem>> QueryWord(string word)
+        public static async Task<List<StarDictWordItem>> QueryWord(string word, CancellationToken cancellationToken = default)
         {
             try
             {
-                await InitializeDatabase();
+                using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 List<StarDictWordItem> results = [];
-                using SqliteCommand selectCommand = new($"select * from stardict where word = $word", _starDictDb);
+                using SqliteCommand selectCommand = new($"select * from stardict where word = $word", connection);
                 selectCommand.Parameters.AddWithValue("$word", word);
-                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync();
-                while (await query.ReadAsync() == true)
+                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
                 {
-                    results.Add(new StarDictWordItem
-                    {
-                        Id = query.IsDBNull(0) ? -1 : query.GetInt32(0),
-                        Word = query.IsDBNull(1) ? string.Empty : query.GetString(1),
-                        StripWord = query.IsDBNull(2) ? string.Empty : query.GetString(2),
-                        Phonetic = query.IsDBNull(3) ? string.Empty : query.GetString(3),
-                        Definition = query.IsDBNull(4) ? string.Empty : query.GetString(4),
-                        Translation = query.IsDBNull(5) ? string.Empty : query.GetString(5),
-                        Exchange = query.IsDBNull(12) ? string.Empty : query.GetString(12)
-                    });
+                    results.Add(ReadWordItem(query));
                 }
                 return results;
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
             return [];
         }
@@ -121,33 +128,51 @@ namespace Flint3.Data
         /// </summary>
         /// <param name="word">前缀匹配的单词文本</param>
         /// <param name="limit">查询结果条数限制</param>
+        /// <param name="cancellationToken"></param>
         /// <returns>特定数量的前缀匹配的单词</returns>
-        public static async Task<List<StarDictWordItem>> MatchWord(string word, int limit)
+        public static async Task<List<StarDictWordItem>> MatchWord(string word, int limit, CancellationToken cancellationToken = default)
         {
             try
             {
-                await InitializeDatabase();
+                using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 List<StarDictWordItem> results = [];
-                using SqliteCommand selectCommand = new($"select * from stardict where sw >= $word order by sw, word collate nocase limit $limit", _starDictDb);
+                using SqliteCommand selectCommand = new($"select * from stardict where sw >= $word order by sw, word collate nocase limit $limit", connection);
                 selectCommand.Parameters.AddWithValue("$word", word);
                 selectCommand.Parameters.AddWithValue("$limit", limit);
-                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync();
-                while (await query.ReadAsync() == true)
+                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
                 {
-                    results.Add(new StarDictWordItem
-                    {
-                        Id = query.IsDBNull(0) ? -1 : query.GetInt64(0),
-                        Word = query.IsDBNull(1) ? string.Empty : query.GetString(1),
-                        StripWord = query.IsDBNull(2) ? string.Empty : query.GetString(2),
-                        Phonetic = query.IsDBNull(3) ? string.Empty : query.GetString(3),
-                        Definition = query.IsDBNull(4) ? string.Empty : query.GetString(4),
-                        Translation = query.IsDBNull(5) ? string.Empty : query.GetString(5),
-                        Exchange = query.IsDBNull(12) ? string.Empty : query.GetString(12)
-                    });
+                    results.Add(ReadWordItem(query));
                 }
                 return results;
             }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+            return [];
+        }
+
+        /// <summary>
+        /// 按 SQL LIKE 模式匹配单词；模式形态由调用方约束，后续接入 wordle 时再收紧
+        /// </summary>
+        public static async Task<List<StarDictWordItem>> PatternWord(string pattern, int limit, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+                List<StarDictWordItem> results = [];
+                using SqliteCommand selectCommand = new($"select * from stardict where word like $pattern order by word collate nocase limit $limit", connection);
+                selectCommand.Parameters.AddWithValue("$pattern", pattern);
+                selectCommand.Parameters.AddWithValue("$limit", limit);
+                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
+                {
+                    results.Add(ReadWordItem(query));
+                }
+                return results;
+            }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
             return [];
         }
@@ -163,68 +188,40 @@ namespace Flint3.Data
         /// <returns>完整的单词列表</returns>
         public static async Task<List<StarDictWordItem>> GetAllExtraGlossaryWords(string tag, string word, CancellationToken cancellationToken)
         {
-            SqliteCommand? selectCommand = null;
-
             try
             {
-                await InitializeDatabase();
+                using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 List<StarDictWordItem> results = [];
+                using SqliteCommand selectCommand = tag != "oxford"
+                    ? new SqliteCommand($"select * from stardict where tag like $tag order by word collate nocase", connection)
+                    : new SqliteCommand($"select * from stardict where oxford = 1 order by word collate nocase", connection);
 
                 if (tag != "oxford")
                 {
-                    if (string.IsNullOrWhiteSpace(word))
+                    if (!string.IsNullOrWhiteSpace(word))
                     {
-                        selectCommand = new SqliteCommand($"select * from stardict where tag like $tag order by word collate nocase", _starDictDb);
-                    }
-                    else
-                    {
-                        selectCommand = new SqliteCommand($"select * from stardict where tag like $tag and word like $word order by word collate nocase", _starDictDb);
+                        selectCommand.CommandText = "select * from stardict where tag like $tag and word like $word order by word collate nocase";
                         selectCommand.Parameters.AddWithValue("$word", word + "%");
                     }
                     selectCommand.Parameters.AddWithValue("$tag", "%" + tag + "%");
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(word))
                 {
-                    if (string.IsNullOrWhiteSpace(word))
-                    {
-                        selectCommand = new SqliteCommand($"select * from stardict where oxford = 1 order by word collate nocase", _starDictDb);
-                    }
-                    else
-                    {
-                        selectCommand = new SqliteCommand($"select * from stardict where oxford = 1 and word like $word order by word collate nocase", _starDictDb);
-                        selectCommand.Parameters.AddWithValue("$word", word + "%");
-                    }
+                    selectCommand.CommandText = "select * from stardict where oxford = 1 and word like $word order by word collate nocase";
+                    selectCommand.Parameters.AddWithValue("$word", word + "%");
                 }
 
-                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken);
-                while (await query.ReadAsync(cancellationToken) == true)
+                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        throw new TaskCanceledException();
-                    }
-
-                    results.Add(new StarDictWordItem
-                    {
-                        Id = query.IsDBNull(0) ? -1 : query.GetInt64(0),
-                        Word = query.IsDBNull(1) ? string.Empty : query.GetString(1),
-                        StripWord = query.IsDBNull(2) ? string.Empty : query.GetString(2),
-                        Phonetic = query.IsDBNull(3) ? string.Empty : query.GetString(3),
-                        Definition = query.IsDBNull(4) ? string.Empty : query.GetString(4),
-                        Translation = query.IsDBNull(5) ? string.Empty : query.GetString(5),
-                        Exchange = query.IsDBNull(12) ? string.Empty : query.GetString(12)
-                    });
+                    results.Add(ReadWordItem(query));
                 }
 
                 return results;
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
-            finally
-            {
-                selectCommand?.Dispose();
-            }
-
             return [];
         }
 
@@ -239,72 +236,43 @@ namespace Flint3.Data
         /// <returns>增量获取的单词列表</returns>
         public static async Task<List<StarDictWordItem>> GetIncrementalExtraGlossaryWords(string tag, long startId, int limit, string word, CancellationToken cancellationToken)
         {
-            SqliteCommand? selectCommand = null;
-
             try
             {
-                await InitializeDatabase();
+                using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 List<StarDictWordItem> results = [];
+                using SqliteCommand selectCommand = tag != "oxford"
+                    ? new($"select * from stardict where tag like $tag and id > $id order by word collate nocase limit $limit", connection)
+                    : new($"select * from stardict where oxford = 1 and id > $id order by word collate nocase limit $limit", connection);
 
                 if (tag != "oxford")
                 {
-                    if (string.IsNullOrWhiteSpace(word))
+                    if (!string.IsNullOrWhiteSpace(word))
                     {
-                        selectCommand = new($"select * from stardict where tag like $tag and id > $id order by word collate nocase limit $limit", _starDictDb);
-                    }
-                    else
-                    {
-                        selectCommand = new($"select * from stardict where tag like $tag and id > $id and word like $word order by word collate nocase limit $limit", _starDictDb);
+                        selectCommand.CommandText = "select * from stardict where tag like $tag and id > $id and word like $word order by word collate nocase limit $limit";
                         selectCommand.Parameters.AddWithValue("$word", word + "%");
                     }
-                    selectCommand.Parameters.AddWithValue("$id", startId);
                     selectCommand.Parameters.AddWithValue("$tag", "%" + tag + "%");
-                    selectCommand.Parameters.AddWithValue("$limit", limit);
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(word))
                 {
-                    if (string.IsNullOrWhiteSpace(word))
-                    {
-                        selectCommand = new($"select * from stardict where oxford = 1 and id > $id order by word collate nocase limit $limit", _starDictDb);
-                    }
-                    else
-                    {
-                        selectCommand = new($"select * from stardict where oxford = 1 and id > $id and word like $word order by word collate nocase limit $limit", _starDictDb);
-                        selectCommand.Parameters.AddWithValue("$word", word + "%");
-                    }
-                    selectCommand.Parameters.AddWithValue("$id", startId);
-                    selectCommand.Parameters.AddWithValue("$limit", limit);
+                    selectCommand.CommandText = "select * from stardict where oxford = 1 and id > $id and word like $word order by word collate nocase limit $limit";
+                    selectCommand.Parameters.AddWithValue("$word", word + "%");
                 }
 
-                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken);
-                while (await query.ReadAsync(cancellationToken) == true)
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        throw new TaskCanceledException();
-                    }
+                selectCommand.Parameters.AddWithValue("$id", startId);
+                selectCommand.Parameters.AddWithValue("$limit", limit);
 
-                    results.Add(new StarDictWordItem
-                    {
-                        Id = query.IsDBNull(0) ? -1 : query.GetInt64(0),
-                        Word = query.IsDBNull(1) ? string.Empty : query.GetString(1),
-                        StripWord = query.IsDBNull(2) ? string.Empty : query.GetString(2),
-                        Phonetic = query.IsDBNull(3) ? string.Empty : query.GetString(3),
-                        Definition = query.IsDBNull(4) ? string.Empty : query.GetString(4),
-                        Translation = query.IsDBNull(5) ? string.Empty : query.GetString(5),
-                        Exchange = query.IsDBNull(12) ? string.Empty : query.GetString(12)
-                    });
+                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
+                {
+                    results.Add(ReadWordItem(query));
                 }
 
                 return results;
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
-            finally
-            {
-                selectCommand?.Dispose();
-            }
-
             return [];
         }
 
@@ -313,29 +281,28 @@ namespace Flint3.Data
         /// </summary>
         /// <param name="tag">内置生词本标签</param>
         /// <returns>单词数量</returns>
-        public static async Task<int> GetExtraGlossaryWordsCount(string tag)
+        public static async Task<int> GetExtraGlossaryWordsCount(string tag, CancellationToken cancellationToken = default)
         {
             try
             {
-                await InitializeDatabase();
+                using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 using SqliteCommand selectCommand = tag != "oxford"
-                    ? new SqliteCommand($"select count(*) from stardict where tag LIKE $tag;", _starDictDb)
-                    : new SqliteCommand($"select count(*) from stardict where oxford = 1;", _starDictDb);
+                    ? new SqliteCommand($"select count(*) from stardict where tag LIKE $tag;", connection)
+                    : new SqliteCommand($"select count(*) from stardict where oxford = 1;", connection);
 
                 if (tag != "oxford")
                 {
                     selectCommand.Parameters.AddWithValue("$tag", "%" + tag + "%");
                 }
 
-                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync();
-                while (await query.ReadAsync() == true)
+                using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
                 {
-                    StarDictWordItem item = new();
-                    var count = query.IsDBNull(0) ? -1 : query.GetInt32(0);
-                    return count;
+                    return query.IsDBNull(0) ? -1 : query.GetInt32(0);
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
             return -1;
         }

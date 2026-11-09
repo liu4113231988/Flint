@@ -21,7 +21,7 @@ namespace Flint3.Core.Input
             input.Anonymous.ki.dwFlags = keyUp ? KEYBD_EVENT_FLAGS.KEYEVENTF_KEYUP : 0;
             input.Anonymous.ki.dwExtraInfo = extraInfo;
 
-            PInvoke.SendInput(1, &input, Marshal.SizeOf<INPUT>());
+            Flint3CorePInvoke.SendInput(1, &input, Marshal.SizeOf<INPUT>());
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace Flint3.Core.Input
 
         public static bool IsKeyDown(int virtualKey)
         {
-            return (PInvoke.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+            return (Flint3CorePInvoke.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
         }
     }
 }

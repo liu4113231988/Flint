@@ -44,7 +44,7 @@ namespace Flint3.Core.Tests
         public void GetKeyName_ResolvesCharactersWithFixedUsLayout()
         {
             // KLF_NOTELLSHELL：只加载不激活 en-US 布局，用于稳定断言；Dispose 时卸载
-            using var layoutHandle = PInvoke.LoadKeyboardLayout("00000409", ACTIVATE_KEYBOARD_LAYOUT_FLAGS.KLF_NOTELLSHELL);
+            using var layoutHandle = Flint3CorePInvoke.LoadKeyboardLayout("00000409", ACTIVATE_KEYBOARD_LAYOUT_FLAGS.KLF_NOTELLSHELL);
             if (layoutHandle.IsInvalid)
             {
                 // 系统未安装 en-US 布局时跳过字符断言（特殊键用例已覆盖）

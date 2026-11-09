@@ -13,6 +13,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Flint3.Core\Flint3.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
         <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.1" />

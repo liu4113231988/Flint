@@ -1,10 +1,6 @@
-﻿#nullable enable
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
+﻿using System;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Microsoft.Windows.Storage;
+using Flint3.Core.Settings;
 
 namespace Flint3.Helpers
 {
@@ -25,17 +21,22 @@ namespace Flint3.Helpers
         private const string SETTING_NAME_CLOSEBUTTONMODE = "CloseButtonMode";
         private const string SETTING_NAME_SEARCHBOXSTYLE = "SearchBoxStyle";
 
-        private readonly SettingsStore _localSettings = new SettingsStore();
+        private readonly ISettingsStore _store;
+
+        public SettingsService(ISettingsStore? store = null)
+        {
+            _store = store ?? new ApplicationDataSettingsStore();
+        }
 
         /// <summary>
         /// 读取设置项（打包运行时来自 ApplicationData，免打包运行时来自本地文件）
         /// </summary>
-        public object? GetValue(string key) => _localSettings.Values[key];
+        public object? GetValue(string key) => _store[key];
 
         /// <summary>
         /// 写入设置项
         /// </summary>
-        public void SetValue(string key, object? value) => _localSettings.Values[key] = value;
+        public void SetValue(string key, object? value) => _store[key] = value;
 
         private double _mainWindowWidth = -1;
 
@@ -78,7 +79,7 @@ namespace Flint3.Helpers
                 {
                     if (_mainWindowWidth < 0)
                     {
-                        if (double.TryParse(_localSettings.Values[FLINT_MAINWINDOW_WIDTH]?.ToString(), out double width))
+                        if (double.TryParse(_store[FLINT_MAINWINDOW_WIDTH]?.ToString(), out double width))
                         {
                             _mainWindowWidth = width;
                         }
@@ -95,7 +96,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _mainWindowWidth, value);
-                _localSettings.Values[FLINT_MAINWINDOW_WIDTH] = _mainWindowWidth;
+                _store[FLINT_MAINWINDOW_WIDTH] = _mainWindowWidth;
             }
         }
 
@@ -110,7 +111,7 @@ namespace Flint3.Helpers
                 {
                     if (_mainWindowHeight < 0)
                     {
-                        if (double.TryParse(_localSettings.Values[FLINT_MAINWINDOW_HEIGHT]?.ToString(), out double height))
+                        if (double.TryParse(_store[FLINT_MAINWINDOW_HEIGHT]?.ToString(), out double height))
                         {
                             _mainWindowHeight = height;
                         }
@@ -127,7 +128,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _mainWindowHeight, value);
-                _localSettings.Values[FLINT_MAINWINDOW_HEIGHT] = _mainWindowHeight;
+                _store[FLINT_MAINWINDOW_HEIGHT] = _mainWindowHeight;
             }
         }
 
@@ -142,19 +143,19 @@ namespace Flint3.Helpers
                 {
                     if (_appearanceIndex < 0)
                     {
-                        if (_localSettings.Values[SETTING_NAME_APPEARANCEINDEX] == null)
+                        if (_store[SETTING_NAME_APPEARANCEINDEX] == null)
                         {
                             _appearanceIndex = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_APPEARANCEINDEX]?.ToString() == "0")
+                        else if (_store[SETTING_NAME_APPEARANCEINDEX]?.ToString() == "0")
                         {
                             _appearanceIndex = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_APPEARANCEINDEX]?.ToString() == "1")
+                        else if (_store[SETTING_NAME_APPEARANCEINDEX]?.ToString() == "1")
                         {
                             _appearanceIndex = 1;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_APPEARANCEINDEX]?.ToString() == "2")
+                        else if (_store[SETTING_NAME_APPEARANCEINDEX]?.ToString() == "2")
                         {
                             _appearanceIndex = 2;
                         }
@@ -171,7 +172,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _appearanceIndex, value);
-                _localSettings.Values[SETTING_NAME_APPEARANCEINDEX] = _appearanceIndex;
+                _store[SETTING_NAME_APPEARANCEINDEX] = _appearanceIndex;
                 AppearanceSettingChanged?.Invoke(this, _appearanceIndex);
             }
         }
@@ -187,15 +188,15 @@ namespace Flint3.Helpers
                 {
                     if (_backdropIndex < 0)
                     {
-                        if (_localSettings.Values[SETTING_NAME_BACKDROPINDEX] == null)
+                        if (_store[SETTING_NAME_BACKDROPINDEX] == null)
                         {
                             _backdropIndex = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_BACKDROPINDEX]?.ToString() == "0")
+                        else if (_store[SETTING_NAME_BACKDROPINDEX]?.ToString() == "0")
                         {
                             _backdropIndex = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_BACKDROPINDEX]?.ToString() == "1")
+                        else if (_store[SETTING_NAME_BACKDROPINDEX]?.ToString() == "1")
                         {
                             _backdropIndex = 1;
                         }
@@ -212,7 +213,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _backdropIndex, value);
-                _localSettings.Values[SETTING_NAME_BACKDROPINDEX] = _backdropIndex;
+                _store[SETTING_NAME_BACKDROPINDEX] = _backdropIndex;
                 BackdropSettingChanged?.Invoke(this, _backdropIndex);
             }
         }
@@ -228,11 +229,11 @@ namespace Flint3.Helpers
                 {
                     if (_enableEngDefinition is null)
                     {
-                        if (_localSettings.Values[SETTING_NAME_ENABLEENGDEF] == null)
+                        if (_store[SETTING_NAME_ENABLEENGDEF] == null)
                         {
                             _enableEngDefinition = true;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_ENABLEENGDEF]?.ToString() == "False")
+                        else if (_store[SETTING_NAME_ENABLEENGDEF]?.ToString() == "False")
                         {
                             _enableEngDefinition = false;
                         }
@@ -249,7 +250,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _enableEngDefinition, value);
-                _localSettings.Values[SETTING_NAME_ENABLEENGDEF] = _enableEngDefinition;
+                _store[SETTING_NAME_ENABLEENGDEF] = _enableEngDefinition;
             }
         }
 
@@ -264,11 +265,11 @@ namespace Flint3.Helpers
                 {
                     if (_enableGlossary is null)
                     {
-                        if (_localSettings.Values[SETTING_NAME_ENABLEGLOSSARY] == null)
+                        if (_store[SETTING_NAME_ENABLEGLOSSARY] == null)
                         {
                             _enableGlossary = true;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_ENABLEGLOSSARY]?.ToString() == "False")
+                        else if (_store[SETTING_NAME_ENABLEGLOSSARY]?.ToString() == "False")
                         {
                             _enableGlossary = false;
                         }
@@ -285,7 +286,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _enableGlossary, value);
-                _localSettings.Values[SETTING_NAME_ENABLEGLOSSARY] = _enableGlossary;
+                _store[SETTING_NAME_ENABLEGLOSSARY] = _enableGlossary;
             }
         }
 
@@ -300,7 +301,7 @@ namespace Flint3.Helpers
                 {
                     if (_enableTTS is null)
                     {
-                        if (_localSettings.Values[SETTING_NAME_ENABLETTS]?.ToString() == "True")
+                        if (_store[SETTING_NAME_ENABLETTS]?.ToString() == "True")
                         {
                             _enableTTS = true;
                         }
@@ -317,7 +318,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _enableTTS, value);
-                _localSettings.Values[SETTING_NAME_ENABLETTS] = _enableTTS;
+                _store[SETTING_NAME_ENABLETTS] = _enableTTS;
             }
         }
 
@@ -332,13 +333,13 @@ namespace Flint3.Helpers
                 {
                     if (_ttsVoice is null)
                     {
-                        if (_localSettings.Values[SETTING_NAME_TTSVOICE] is null)
+                        if (_store[SETTING_NAME_TTSVOICE] is null)
                         {
                             _ttsVoice = "";
                         }
                         else
                         {
-                            _ttsVoice = _localSettings.Values[SETTING_NAME_TTSVOICE].ToString();
+                            _ttsVoice = _store[SETTING_NAME_TTSVOICE].ToString();
                         }
                     }
                 }
@@ -349,7 +350,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _ttsVoice, value);
-                _localSettings.Values[SETTING_NAME_TTSVOICE] = _ttsVoice;
+                _store[SETTING_NAME_TTSVOICE] = _ttsVoice;
             }
         }
 
@@ -364,7 +365,7 @@ namespace Flint3.Helpers
                 {
                     if (_ttsVolume < 0)
                     {
-                        if (int.TryParse(_localSettings.Values[SETTING_NAME_TTSVOLUME]?.ToString(), out int volume))
+                        if (int.TryParse(_store[SETTING_NAME_TTSVOLUME]?.ToString(), out int volume))
                         {
                             _ttsVolume = volume;
                         }
@@ -381,7 +382,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _ttsVolume, value);
-                _localSettings.Values[SETTING_NAME_TTSVOLUME] = _ttsVolume;
+                _store[SETTING_NAME_TTSVOLUME] = _ttsVolume;
             }
         }
 
@@ -396,15 +397,15 @@ namespace Flint3.Helpers
                 {
                     if (_windowMode < 0)
                     {
-                        if (_localSettings.Values[SETTING_NAME_WINDOWMODE] == null)
+                        if (_store[SETTING_NAME_WINDOWMODE] == null)
                         {
                             _windowMode = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_WINDOWMODE]?.ToString() == "0")
+                        else if (_store[SETTING_NAME_WINDOWMODE]?.ToString() == "0")
                         {
                             _windowMode = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_WINDOWMODE]?.ToString() == "1")
+                        else if (_store[SETTING_NAME_WINDOWMODE]?.ToString() == "1")
                         {
                             _windowMode = 1;
                         }
@@ -421,7 +422,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _windowMode, value);
-                _localSettings.Values[SETTING_NAME_WINDOWMODE] = _windowMode;
+                _store[SETTING_NAME_WINDOWMODE] = _windowMode;
             }
         }
 
@@ -436,11 +437,11 @@ namespace Flint3.Helpers
                 {
                     if (_autoClearLastInput is null)
                     {
-                        if (_localSettings.Values[SETTING_NAME_AUTOCLEARLASTINPUT] == null)
+                        if (_store[SETTING_NAME_AUTOCLEARLASTINPUT] == null)
                         {
                             _autoClearLastInput = false;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_AUTOCLEARLASTINPUT]?.ToString() == "True")
+                        else if (_store[SETTING_NAME_AUTOCLEARLASTINPUT]?.ToString() == "True")
                         {
                             _autoClearLastInput = true;
                         }
@@ -457,7 +458,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _autoClearLastInput, value);
-                _localSettings.Values[SETTING_NAME_AUTOCLEARLASTINPUT] = _autoClearLastInput;
+                _store[SETTING_NAME_AUTOCLEARLASTINPUT] = _autoClearLastInput;
             }
         }
 
@@ -472,15 +473,15 @@ namespace Flint3.Helpers
                 {
                     if (_closeButtonMode < 0)
                     {
-                        if (_localSettings.Values[SETTING_NAME_CLOSEBUTTONMODE] == null)
+                        if (_store[SETTING_NAME_CLOSEBUTTONMODE] == null)
                         {
                             _closeButtonMode = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_CLOSEBUTTONMODE]?.ToString() == "0")
+                        else if (_store[SETTING_NAME_CLOSEBUTTONMODE]?.ToString() == "0")
                         {
                             _closeButtonMode = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_CLOSEBUTTONMODE]?.ToString() == "1")
+                        else if (_store[SETTING_NAME_CLOSEBUTTONMODE]?.ToString() == "1")
                         {
                             _closeButtonMode = 1;
                         }
@@ -497,7 +498,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _closeButtonMode, value);
-                _localSettings.Values[SETTING_NAME_CLOSEBUTTONMODE] = _closeButtonMode;
+                _store[SETTING_NAME_CLOSEBUTTONMODE] = _closeButtonMode;
             }
         }
 
@@ -512,19 +513,19 @@ namespace Flint3.Helpers
                 {
                     if (_searchBoxStyle < 0)
                     {
-                        if (_localSettings.Values[SETTING_NAME_SEARCHBOXSTYLE] == null)
+                        if (_store[SETTING_NAME_SEARCHBOXSTYLE] == null)
                         {
                             _searchBoxStyle = 2;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_SEARCHBOXSTYLE]?.ToString() == "0")
+                        else if (_store[SETTING_NAME_SEARCHBOXSTYLE]?.ToString() == "0")
                         {
                             _searchBoxStyle = 0;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_SEARCHBOXSTYLE]?.ToString() == "1")
+                        else if (_store[SETTING_NAME_SEARCHBOXSTYLE]?.ToString() == "1")
                         {
                             _searchBoxStyle = 1;
                         }
-                        else if (_localSettings.Values[SETTING_NAME_SEARCHBOXSTYLE]?.ToString() == "2")
+                        else if (_store[SETTING_NAME_SEARCHBOXSTYLE]?.ToString() == "2")
                         {
                             _searchBoxStyle = 2;
                         }
@@ -541,98 +542,7 @@ namespace Flint3.Helpers
             set
             {
                 SetProperty(ref _searchBoxStyle, value);
-                _localSettings.Values[SETTING_NAME_SEARCHBOXSTYLE] = _searchBoxStyle;
-            }
-        }
-
-        /// <summary>
-        /// 无包标识（免打包）时退化为 LocalAppData 下的 json 文件
-        /// </summary>
-        private sealed class SettingsStore
-        {
-            private readonly ApplicationDataContainer? _container;
-            private readonly string? _filePath;
-            private readonly Dictionary<string, string> _fileValues = new();
-
-            public SettingsStore()
-            {
-                Values = new ValuesAccessor(this);
-                try
-                {
-                    _container = ApplicationData.GetDefault().LocalSettings;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Trace.WriteLine(ex);
-                    string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Flint3");
-                    Directory.CreateDirectory(folder);
-                    _filePath = Path.Combine(folder, "settings.json");
-                    Load();
-                }
-            }
-
-            public ValuesAccessor Values { get; }
-
-            private object? Get(string key)
-            {
-                if (_container is not null)
-                {
-                    return _container.Values[key];
-                }
-                return _fileValues.TryGetValue(key, out string? value) ? value : null;
-            }
-
-            private void Set(string key, object? value)
-            {
-                if (_container is not null)
-                {
-                    _container.Values[key] = value;
-                    return;
-                }
-                _fileValues[key] = value?.ToString() ?? string.Empty;
-                Save();
-            }
-
-            private void Load()
-            {
-                try
-                {
-                    if (!File.Exists(_filePath))
-                    {
-                        return;
-                    }
-                    var loaded = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(_filePath!));
-                    if (loaded is not null)
-                    {
-                        foreach (var pair in loaded)
-                        {
-                            _fileValues[pair.Key] = pair.Value;
-                        }
-                    }
-                }
-                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
-            }
-
-            private void Save()
-            {
-                try
-                {
-                    File.WriteAllText(_filePath!, JsonSerializer.Serialize(_fileValues));
-                }
-                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
-            }
-
-            public sealed class ValuesAccessor
-            {
-                private readonly SettingsStore _owner;
-
-                public ValuesAccessor(SettingsStore owner) => _owner = owner;
-
-                public object? this[string key]
-                {
-                    get => _owner.Get(key);
-                    set => _owner.Set(key, value);
-                }
+                _store[SETTING_NAME_SEARCHBOXSTYLE] = _searchBoxStyle;
             }
         }
     }

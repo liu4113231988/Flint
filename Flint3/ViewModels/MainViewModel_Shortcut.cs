@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flint3.Core.Input;
+using Flint3.Core.Serialization;
 using Flint3.Helpers;
 using Flint3.Models;
 
@@ -124,7 +125,7 @@ namespace Flint3.ViewModels
                 string json = await StorageFilesService.ReadFileAsync("shortcutsettings");
                 if (!string.IsNullOrWhiteSpace(json))
                 {
-                    var shortcut = JsonSerializer.Deserialize<HotkeySettings>(json);
+                    var shortcut = JsonSerializer.Deserialize(json, FlintJsonContext.Default.HotkeySettings);
                     this.ActivationShortcut = shortcut;
                     return;
                 }
@@ -137,7 +138,7 @@ namespace Flint3.ViewModels
         {
             try
             {
-                string json = JsonSerializer.Serialize(this.ActivationShortcut);
+                string json = JsonSerializer.Serialize(this.ActivationShortcut, FlintJsonContext.Default.HotkeySettings);
                 bool ret = await StorageFilesService.WriteFileAsync("shortcutsettings", json);
             }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
@@ -161,6 +162,7 @@ namespace Flint3.ViewModels
                     }
 
                     _hotkeyService?.Dispose();
+                    _searchCoordinator.Dispose();
                     _disposed = true;
                 }
             }
