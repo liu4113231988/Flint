@@ -27,7 +27,7 @@ namespace Flint3.ViewModels
         /// </summary>
         private void InitViewModel4Flint()
         {
-            // 加载单词数据库（不使用await将无法捕获方法内部的异常）
+            // 预热数据库连接；查询方法会等待同一个初始化任务，避免启动后立即输入时查不到词
             _ = StarDictDataAccess.InitializeDatabase();
         }
 

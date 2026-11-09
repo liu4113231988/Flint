@@ -12,11 +12,36 @@ namespace Flint3.Data
     {
         private static SqliteConnection? _starDictDb = null;
 
-        public static async Task InitializeDatabase()
-        {
-            _starDictDb = new SqliteConnection($"Filename={Path.Combine(AppContext.BaseDirectory, "Data/stardict.db")}");
-            await _starDictDb.OpenAsync();
+        private static Task? _initializeTask = null;
 
+        private static readonly object _initializeLock = new();
+
+        private static string? _databasePath = null;
+
+        /// <summary>
+        /// 初始化数据库连接，可被重复调用；查询方法内部也会等待此任务完成
+        /// </summary>
+        /// <param name="databasePath">数据库路径，为空时沿用上次路径（默认输出目录下的 Data/stardict.db，测试可传入自己的库）</param>
+        public static Task InitializeDatabase(string? databasePath = null)
+        {
+            lock (_initializeLock)
+            {
+                if (databasePath is not null)
+                {
+                    _databasePath = databasePath;
+                }
+
+                if (_initializeTask is null)
+                {
+                    string path = _databasePath ?? Path.Combine(AppContext.BaseDirectory, "Data", "stardict.db");
+                    _starDictDb = new SqliteConnection($"Filename={path}");
+                    _initializeTask = _starDictDb.OpenAsync();
+                }
+
+                return _initializeTask;
+            }
+
+            // 库结构参考（发布库已自带索引，见计划 D4）
             //string tableCommand =
             //    "CREATE TABLE IF NOT EXISTS stardict (" +
             //        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE," +
@@ -46,9 +71,13 @@ namespace Flint3.Data
         {
             try
             {
-                _starDictDb?.Close();
-                _starDictDb?.Dispose();
-                _starDictDb = null;
+                lock (_initializeLock)
+                {
+                    _starDictDb?.Close();
+                    _starDictDb?.Dispose();
+                    _starDictDb = null;
+                    _initializeTask = null;
+                }
             }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
         }
@@ -62,6 +91,8 @@ namespace Flint3.Data
         {
             try
             {
+                await InitializeDatabase();
+
                 List<StarDictWordItem> results = [];
                 using SqliteCommand selectCommand = new($"select * from stardict where word = $word", _starDictDb);
                 selectCommand.Parameters.AddWithValue("$word", word);
@@ -95,6 +126,8 @@ namespace Flint3.Data
         {
             try
             {
+                await InitializeDatabase();
+
                 List<StarDictWordItem> results = [];
                 using SqliteCommand selectCommand = new($"select * from stardict where sw >= $word order by sw, word collate nocase limit $limit", _starDictDb);
                 selectCommand.Parameters.AddWithValue("$word", word);
@@ -134,6 +167,8 @@ namespace Flint3.Data
 
             try
             {
+                await InitializeDatabase();
+
                 List<StarDictWordItem> results = [];
 
                 if (tag != "oxford")
@@ -208,6 +243,8 @@ namespace Flint3.Data
 
             try
             {
+                await InitializeDatabase();
+
                 List<StarDictWordItem> results = [];
 
                 if (tag != "oxford")
@@ -280,6 +317,8 @@ namespace Flint3.Data
         {
             try
             {
+                await InitializeDatabase();
+
                 using SqliteCommand selectCommand = tag != "oxford"
                     ? new SqliteCommand($"select count(*) from stardict where tag LIKE $tag;", _starDictDb)
                     : new SqliteCommand($"select count(*) from stardict where oxford = 1;", _starDictDb);
