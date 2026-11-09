@@ -54,7 +54,24 @@ dotnet test tests\Flint3.Data.Tests\Flint3.Data.Tests.csproj
 - 数据层用例使用临时目录里的小型 fixture 库，不依赖真实 `stardict.db`
 - 真实库校验用例默认跳过；`tools/prepare-data.ps1` 会设置 `FLINT_STARDICT_DB` 单独运行它
 
-## 5. 常见问题
+## 5. 发布（AOT / R2R）
+
+```powershell
+# 核心库 NativeAOT 验证（CLI harness，可在指定词典库上查词）
+dotnet publish tools\Flint.Cli\Flint.Cli.csproj -c Release -r win-x64 -p:PublishAot=true
+tools\Flint.Cli\bin\Release\net10.0-windows10.0.22000.0\win-x64\publish\Flint.Cli.exe `
+    Flint3\Data\stardict.db match apple 10
+
+# UI：R2R + CsWinRT AOT，不裁剪
+dotnet publish Flint3\Flint3.csproj -c Release -r win-x64 -p:Platform=x64 `
+    -p:PublishReadyToRun=true -p:PublishTrimmed=false
+```
+
+- UI 发布目录可直接拷贝运行；`PublishTrimmed` 必须保持 `false`（WinUI 3 不支持裁剪，见 AOT 口径 L1）
+- 发布产物必须包含 `Assets/`、`*.xbf` 和 `Flint3.pri`：前两者缺失会导致启动后无窗口，`.pri` 缺失会引发资源查找失败。`Flint3.csproj` 里的 `IncludeWinUIXamlArtifactsInPublish` 目标负责把它们补进发布项
+- 实测数据（启动耗时、内存、体积）见 [aot-report.md](aot-report.md)
+
+## 6. 常见问题
 
 | 现象 | 原因与处理 |
 | --- | --- |

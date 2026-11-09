@@ -82,7 +82,26 @@
         <Content Include="Data\stardict.db">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <!-- WinUI 默认只把 Assets 交给 AppX 打包流程，免打包发布需要显式标记，否则运行时读不到图标等资源 -->
+        <Content Update="Assets\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        </Content>
     </ItemGroup>
+
+    <!-- WinUI 的 xbf/项目 pri 只在 build 输出里，Publish 不会自动带上，这里补进发布项 -->
+    <Target Name="IncludeWinUIXamlArtifactsInPublish" AfterTargets="ComputeFilesToPublish">
+        <ItemGroup>
+            <_WinUIXamlArtifact Include="$(TargetDir)**\*.xbf" />
+            <_WinUIXamlArtifact Include="$(TargetDir)$(AssemblyName).pri" Condition="Exists('$(TargetDir)$(AssemblyName).pri')" />
+            <ResolvedFileToPublish Include="@(_WinUIXamlArtifact)">
+                <RelativePath Condition="'%(Extension)' == '.xbf'">%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+                <RelativePath Condition="'%(Extension)' == '.pri'">%(Filename)%(Extension)</RelativePath>
+                <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+                <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+            </ResolvedFileToPublish>
+        </ItemGroup>
+    </Target>
 
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
