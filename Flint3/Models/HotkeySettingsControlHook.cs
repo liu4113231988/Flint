@@ -1,5 +1,5 @@
 ﻿using System;
-using interop;
+using Flint3.Core.Input;
 
 namespace Flint3.Models
 {
@@ -41,24 +41,22 @@ namespace Flint3.Models
 
         private void HotkeySettingsHookCallback(KeyboardEvent ev)
         {
-            switch (ev.message)
+            switch (ev.Message)
             {
                 case WmKeyDown:
                 case WmSysKeyDown:
-                    _keyDown(ev.key);
+                    _keyDown(ev.Key);
                     break;
                 case WmKeyUp:
                 case WmSysKeyUp:
-                    _keyUp(ev.key);
+                    _keyUp(ev.Key);
                     break;
             }
         }
 
         private bool FilterKeyboardEvents(KeyboardEvent ev)
         {
-#pragma warning disable CA2020 // Prevent from behavioral change
-            return _filterKeyboardEvent(ev.key, (UIntPtr)ev.dwExtraInfo);
-#pragma warning restore CA2020 // Prevent from behavioral change
+            return _filterKeyboardEvent(ev.Key, ev.ExtraInfo);
         }
 
         protected virtual void Dispose(bool disposing)

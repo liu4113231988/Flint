@@ -2,9 +2,9 @@
 using System.Text.Json;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Flint3.Core.Input;
 using Flint3.Helpers;
 using Flint3.Models;
-using interop;
 
 namespace Flint3.ViewModels
 {
@@ -15,7 +15,7 @@ namespace Flint3.ViewModels
         /// </summary>
         private HotkeySettings _defaultActivationShortcut => new(false, false, true, false, 0x20);
 
-        private HotkeyManager _hotkeyManager = null;
+        private HotkeyService _hotkeyService = null;
 
         private ushort _hotkeyHandle;
 
@@ -64,7 +64,7 @@ namespace Flint3.ViewModels
             {
                 if (_hotkeyHandle != 0)
                 {
-                    _hotkeyManager?.UnregisterHotkey(_hotkeyHandle);
+                    _hotkeyService?.Unregister(_hotkeyHandle);
                     _hotkeyHandle = 0;
                 }
             }
@@ -77,28 +77,19 @@ namespace Flint3.ViewModels
             await SaveShortcutSettings();
         }
 
-        private void RegisterShortcut(HotkeySettings hotkeySettings, HotkeyCallback action)
+        private void RegisterShortcut(HotkeySettings hotkeySettings, Action action)
         {
             try
             {
-                Hotkey hotkey = new()
-                {
-                    Alt = hotkeySettings.Alt,
-                    Shift = hotkeySettings.Shift,
-                    Ctrl = hotkeySettings.Ctrl,
-                    Win = hotkeySettings.Win,
-                    Key = (byte)hotkeySettings.Code,
-                };
-
                 if (_hotkeyHandle != 0)
                 {
-                    _hotkeyManager?.UnregisterHotkey(_hotkeyHandle);
+                    _hotkeyService?.Unregister(_hotkeyHandle);
                     _hotkeyHandle = 0;
                     System.Diagnostics.Trace.WriteLine("Unregistering previous low level key handler");
                 }
 
-                _hotkeyManager ??= new HotkeyManager();
-                _hotkeyHandle = _hotkeyManager.RegisterHotkey(hotkey, action);
+                _hotkeyService ??= new HotkeyService();
+                _hotkeyHandle = _hotkeyService.Register(hotkeySettings, action);
             }
             catch (Exception e)
             {
@@ -107,18 +98,21 @@ namespace Flint3.ViewModels
         }
 
         /// <summary>
-        /// 按下快捷键，唤出主窗口或简洁窗口
+        /// 按下快捷键，唤出主窗口或简洁窗口。钩子线程回调，统一切回 UI 线程且不阻塞钩子
         /// </summary>
         private void OnShortcutActivated()
         {
-            if (this.AppSettings.WindowMode == 1)
+            this.Dispatcher.TryEnqueue(() =>
             {
-                App.ShowLiteWindow();
-            }
-            else
-            {
-                App.ShowMainWindow();
-            }
+                if (this.AppSettings.WindowMode == 1)
+                {
+                    App.ShowLiteWindow();
+                }
+                else
+                {
+                    App.ShowMainWindow();
+                }
+            });
         }
 
         #region 快捷键设置存取
@@ -163,10 +157,10 @@ namespace Flint3.ViewModels
                 {
                     if (_hotkeyHandle != 0)
                     {
-                        _hotkeyManager?.UnregisterHotkey(_hotkeyHandle);
+                        _hotkeyService?.Unregister(_hotkeyHandle);
                     }
 
-                    _hotkeyManager?.Dispose();
+                    _hotkeyService?.Dispose();
                     _disposed = true;
                 }
             }

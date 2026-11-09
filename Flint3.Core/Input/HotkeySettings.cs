@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Serialization;
-using Flint3.Helpers;
 
-namespace Flint3.Models
+namespace Flint3.Core.Input
 {
     public class HotkeySettings
     {
@@ -81,7 +80,7 @@ namespace Flint3.Models
 
             if (Code > 0)
             {
-                var localKey = KeyboardHelper.GetKeyName((uint)Code);
+                var localKey = KeyNameResolver.Default.GetKeyName((uint)Code);
                 output.Append(localKey);
             }
             else if (output.Length >= 2)
@@ -132,7 +131,7 @@ namespace Flint3.Models
                         shortcutList.Add(Code);
                         break;
                     default:
-                        var localKey = KeyboardHelper.GetKeyName((uint)Code);
+                        var localKey = KeyNameResolver.Default.GetKeyName((uint)Code);
                         shortcutList.Add(localKey);
                         break;
                 }
