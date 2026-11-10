@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Flint3.Data.Mdx;
 using Flint3.Dict;
+using Flint3.Helpers;
 using Flint3.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -24,6 +25,9 @@ namespace Flint3.Views
         private MainViewModel _viewModel = null;
 
         private readonly ObservableCollection<MdxDictionaryInfo> _dictionaries = new();
+
+        // 代码回填开关状态时会触发 Toggled，避免把读取当成用户操作
+        private bool _updatingStartupState;
 
         public SettingsPage()
         {
@@ -236,41 +240,34 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// 设置开机自启
+        /// 设置开机自启（免打包应用写入 HKCU Run）
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private async void OnStartupToggled(object sender, RoutedEventArgs e)
+        private void OnStartupToggled(object sender, RoutedEventArgs e)
         {
+            if (_updatingStartupState)
+            {
+                return;
+            }
+
             try
             {
-                var task = await StartupTask.GetAsync("FlintByNoMewing");
-                switch (task.State)
+                if (StartupSettingToggleSwitch.IsOn)
                 {
-                    case StartupTaskState.Disabled:
-                        {
-                            if (StartupSettingToggleSwitch.IsOn != false)
-                            {
-                                await task.RequestEnableAsync();
-                            }
-                        }
-                        break;
-                    case StartupTaskState.Enabled:
-                        {
-                            if (StartupSettingToggleSwitch.IsOn != true)
-                            {
-                                task.Disable();
-                            }
-                        }
-                        break;
+                    StartupUtil.Enable();
                 }
-
-                UpdateStartupState();
+                else
+                {
+                    StartupUtil.Disable();
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex.Message);
             }
+
+            UpdateStartupState();
         }
 
         /// <summary>
@@ -420,41 +417,26 @@ namespace Flint3.Views
         /// <summary>
         /// 获取当前开机自启动状态，更新按钮
         /// </summary>
-        private async void UpdateStartupState()
+        private void UpdateStartupState()
         {
             try
             {
-                var task = await StartupTask.GetAsync("FlintByNoMewing");
-                switch (task.State)
+                bool enabled = StartupUtil.IsEnabled();
+
+                _updatingStartupState = true;
+                try
                 {
-                    case StartupTaskState.Disabled:
-                        StartupSettingToggleSwitch.IsEnabled = true;
-                        StartupSettingToggleSwitch.IsOn = false;
-                        StartupDescTextBlock.Text = "登录到 Windows 时自动启动燧石";
-                        break;
-                    case StartupTaskState.Enabled:
-                        StartupSettingToggleSwitch.IsEnabled = true;
-                        StartupSettingToggleSwitch.IsOn = true;
-                        StartupDescTextBlock.Text = "登录到 Windows 时自动启动燧石";
-                        break;
-                    case StartupTaskState.DisabledByUser:
-                        StartupSettingToggleSwitch.IsEnabled = false;
-                        StartupSettingToggleSwitch.IsOn = false;
-                        StartupDescTextBlock.Text = "无法修改，已被系统设置禁用";
-                        break;
-                    case StartupTaskState.DisabledByPolicy:
-                        StartupSettingToggleSwitch.IsEnabled = false;
-                        StartupSettingToggleSwitch.IsOn = false;
-                        StartupDescTextBlock.Text = "无法修改，已被策略禁用";
-                        break;
-                    case StartupTaskState.EnabledByPolicy:
-                        StartupSettingToggleSwitch.IsEnabled = false;
-                        StartupSettingToggleSwitch.IsOn = true;
-                        StartupDescTextBlock.Text = "无法修改，已被策略启用";
-                        break;
-                    default:
-                        break;
+                    StartupSettingToggleSwitch.IsEnabled = true;
+                    StartupSettingToggleSwitch.IsOn = enabled;
                 }
+                finally
+                {
+                    _updatingStartupState = false;
+                }
+
+                StartupDescTextBlock.Text = enabled
+                    ? "已添加到登录启动项，关闭开关即可移除"
+                    : "登录到 Windows 时自动启动燧石";
             }
             catch (Exception ex)
             {
