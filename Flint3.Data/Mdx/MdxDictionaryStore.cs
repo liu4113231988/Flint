@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -19,6 +20,8 @@ namespace Flint3.Data.Mdx
         private const string SettingsFileName = "dictionarySources.json";
 
         private readonly string _baseDirectory;
+
+        private readonly ConcurrentDictionary<string, byte> _upgrading = new();
 
         public MdxDictionaryStore(string? baseDirectory = null)
         {
@@ -151,7 +154,7 @@ namespace Flint3.Data.Mdx
         }
 
         /// <summary>
-        /// 为所有已启用且文件完整的词库创建查询源
+        /// 为所有已启用且文件完整的词库创建查询源；旧结构版本的索引会在后台自动重建
         /// </summary>
         public IReadOnlyList<IWordSource> CreateSources()
         {
@@ -168,10 +171,63 @@ namespace Flint3.Data.Mdx
                 if (File.Exists(mdxPath) && File.Exists(indexPath))
                 {
                     sources.Add(new MdxSource(info.Name, mdxPath, indexPath));
+                    ScheduleIndexUpgrade(info);
                 }
             }
 
             return sources;
+        }
+
+        /// <summary>
+        /// 用已有的 mdx 副本重建 sidecar 索引；失败时抛出，旧索引保持不动、查询仍可继续
+        /// </summary>
+        public Task RebuildIndexAsync(
+            MdxDictionaryInfo info,
+            IProgress<double>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            string mdxPath = GetDictionaryPath(info);
+            string indexPath = GetIndexPath(info);
+            if (!File.Exists(mdxPath))
+            {
+                throw new FileNotFoundException("找不到词库副本，无法重建索引", mdxPath);
+            }
+
+            return Task.Run(() =>
+            {
+                MdxIndexDatabase.Build(mdxPath, indexPath, progress, cancellationToken);
+
+                // 重建期间词库可能已被删除，避免留下无人引用的索引文件
+                if (!Load().Dictionaries.Exists(item => item.Id == info.Id))
+                {
+                    TryDelete(indexPath);
+                }
+            }, cancellationToken);
+        }
+
+        private void ScheduleIndexUpgrade(MdxDictionaryInfo info)
+        {
+            if (MdxIndexDatabase.IsCurrent(GetIndexPath(info)) || !_upgrading.TryAdd(info.Id, 0))
+            {
+                return;
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await RebuildIndexAsync(info).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // 旧索引仍可查询，失败只影响体积，下次打开会再次尝试
+                    Trace.WriteLine(ex);
+                }
+                finally
+                {
+                    _upgrading.TryRemove(info.Id, out _);
+                }
+            });
         }
 
         private void Save(MdxDictionarySettings settings)
