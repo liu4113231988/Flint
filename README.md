@@ -17,9 +17,19 @@
 
 #### 功能状态
 
-- [x] 基于 C# 重构快捷键唤起窗口，升级到 .NET 10，核心库通过 NativeAOT、UI 使用 R2R（不裁剪）
-- [x] 支持导入 mdx 词库：首期只支持**未加密 + zlib 压缩 + 纯文本词条**，加密 / LZO / `.mdd` 图片留作后续
+- [x] 快捷键唤起窗口改为纯 C# 实现（不再依赖 C++/WinRT Interop），升级到 .NET 10
+- [x] AOT L1：`Flint3.Core`、`Flint3.Data` 可 NativeAOT 发布，UI 使用 R2R + CsWinRT AOT（不裁剪）；整应用 NativeAOT（L2）不在本期范围
+- [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条
 - [x] 单词模式匹配（`?` / `_` 单字母、`*` 任意长度、`^` / `$` 锚定）与内置 Wordle
+- [x] 免打包下的开机自启（写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）与界面版本号
+
+#### 已知限制
+
+- mdx 加密、LZO 压缩、mdx 1.2 版本以及 GBK 等非 UTF-8/UTF-16 编码暂不支持，导入时会给出明确错误
+- `.mdd` 图片 / 发音等资源尚未支持，导入的 mdx 只提供词条文本
+- 整应用 NativeAOT（L2）未做；UI 仍依赖 WinUI 3 的运行时，因此保留 R2R 且不裁剪
+- 没有应用内语言切换，界面语言跟随系统，且只保留中文与英文资源
+- 开机自启只支持当前用户（HKCU），不写入全局启动项
 
 #### 项目结构
 
