@@ -48,11 +48,13 @@ Flint3\bin\x64\Debug\net10.0-windows10.0.26100.0\win-x64\Flint3.exe
 ```powershell
 dotnet test tests\Flint3.Core.Tests\Flint3.Core.Tests.csproj
 dotnet test tests\Flint3.Data.Tests\Flint3.Data.Tests.csproj
+dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj
 ```
 
-- 核心层用例覆盖快捷键 handle 编码、`HotkeySettings` 校验/显示名，以及固定键盘布局下的按键名解析
+- 核心层用例覆盖快捷键 handle 编码、`HotkeySettings` 校验/显示名、固定键盘布局下的按键名解析、模式匹配语法与 Wordle 判定
 - 数据层用例使用临时目录里的小型 fixture 库，不依赖真实 `stardict.db`
 - 真实库校验用例默认跳过；`tools/prepare-data.ps1` 会设置 `FLINT_STARDICT_DB` 单独运行它
+- `legacy/` 下的旧 UWP 工程不参与 `Flint.sln` 构建与测试，仅作历史对照
 
 ## 5. 发布（AOT / R2R）
 

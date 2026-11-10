@@ -15,11 +15,39 @@
 	<img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200"/>
 </a>
 
-#### TODO
+#### 功能状态
 
-- [ ] 基于 C# 重构快捷键唤起窗口的功能，升级 .NET 框架版本，并支持 AOT
-- [ ] 增加导入 mdx 词库文件的功能，进而实现汉英查词甚至更多查词能力
-- [ ] 增加 wordle 功能，可以匹配指定格式的单词，甚至内置完整的 wordle 游戏
+- [x] 基于 C# 重构快捷键唤起窗口，升级到 .NET 10，核心库通过 NativeAOT、UI 使用 R2R（不裁剪）
+- [x] 支持导入 mdx 词库：首期只支持**未加密 + zlib 压缩 + 纯文本词条**，加密 / LZO / `.mdd` 图片留作后续
+- [x] 单词模式匹配（`?` / `_` 单字母、`*` 任意长度、`^` / `$` 锚定）与内置 Wordle
+
+#### 项目结构
+
+| 目录 | 说明 |
+| --- | --- |
+| `Flint3/` | WinUI 3 应用（免打包、自包含、x64） |
+| `Flint3.Core/` | 纯逻辑：查询抽象、快捷键编码、Wordle 状态机与词表 |
+| `Flint3.Data/` | SQLite 数据访问：ECDICT 与 mdx sidecar 索引查询 |
+| `Flint3.Dict/` | mdx 格式解析与索引构建 |
+| `tests/` | Core / Data / Dict 三套 xunit 用例 |
+| `tools/` | 数据准备、mdx 测试数据与 Wordle 词表生成脚本 |
+| `docs/` | [构建说明](docs/build.md)、[AOT 报告](docs/aot-report.md)、[重构计划](docs/refactor-plan.md) |
+
+#### 构建、测试与数据准备
+
+见 [docs/build.md](docs/build.md)。简要命令：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1
+dotnet build Flint.sln -c Debug -p:Platform=x64
+dotnet test tests\Flint3.Core.Tests\Flint3.Core.Tests.csproj
+dotnet test tests\Flint3.Data.Tests\Flint3.Data.Tests.csproj
+dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj
+```
+
+#### 历史实现
+
+早期 UWP 版本（原 `Flint/`、`Flint.Core/`、`Flint.Data/`）已归档到 `legacy/`，不参与解决方案构建，仅保留作行为对照。新代码统一使用 `Flint3*` 项目，`Flint3.Data` 指新的 SQLite 数据层，与旧的 `Flint.Data` 无关。
 
 #### 一睹芳容
 ![screenshot.png](README/screenshot.png)
