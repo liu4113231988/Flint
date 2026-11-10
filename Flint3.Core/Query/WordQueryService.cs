@@ -9,7 +9,7 @@ namespace Flint3.Core.Query
     /// <summary>
     /// 聚合多个词典源的查询结果：去重、按“精确 &gt; 前缀 &gt; 其他”稳定排序并补来源标记
     /// </summary>
-    public sealed class WordQueryService
+    public sealed class WordQueryService : IDisposable
     {
         private readonly IReadOnlyList<IWordSource> _sources;
 
@@ -17,6 +17,20 @@ namespace Flint3.Core.Query
         {
             ArgumentNullException.ThrowIfNull(sources);
             _sources = sources.ToArray();
+        }
+
+        /// <summary>
+        /// 释放持有文件句柄的源（如 mdx），刷新词典列表时由调用方负责
+        /// </summary>
+        public void Dispose()
+        {
+            foreach (IWordSource source in _sources)
+            {
+                if (source is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
         }
 
         public async Task<IReadOnlyList<WordEntry>> QueryAsync(string word, CancellationToken cancellationToken = default)
@@ -66,7 +80,7 @@ namespace Flint3.Core.Query
             CancellationToken cancellationToken)
         {
             Task<IReadOnlyList<WordEntry>>[] tasks = _sources
-                .Select(source => query(source))
+                .Select(source => SafeQueryAsync(source, query, cancellationToken))
                 .ToArray();
 
             IReadOnlyList<WordEntry>[] results = await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -95,6 +109,29 @@ namespace Flint3.Core.Query
             }
 
             return merged;
+        }
+
+        /// <summary>
+        /// 单个词典源失败（文件损坏、库结构不认识等）只丢它自己的结果，不影响其它源
+        /// </summary>
+        private static async Task<IReadOnlyList<WordEntry>> SafeQueryAsync(
+            IWordSource source,
+            Func<IWordSource, Task<IReadOnlyList<WordEntry>>> query,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await query(source).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"查询词典源 {source.Name} 失败: {ex}");
+                return Array.Empty<WordEntry>();
+            }
         }
 
         /// <summary>

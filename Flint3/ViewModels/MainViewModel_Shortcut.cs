@@ -162,6 +162,7 @@ namespace Flint3.ViewModels
                     }
 
                     _hotkeyService?.Dispose();
+                    _wordQueryService?.Dispose();
                     _searchCoordinator.Dispose();
                     _disposed = true;
                 }

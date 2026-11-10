@@ -112,6 +112,36 @@ namespace Flint3.Core.Tests
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.MatchAsync("app", 10, cts.Token));
         }
 
+        [Fact]
+        public async Task MatchAsync_单个源抛异常不影响其它源()
+        {
+            var service = new WordQueryService(new IWordSource[] { new ThrowingSource(), new FakeWordSource("Ecdict", "apple") });
+
+            var words = (await service.MatchAsync("app", 10)).Select(x => x.Word);
+
+            Assert.Equal(new[] { "apple" }, words);
+        }
+
+        private sealed class ThrowingSource : IWordSource
+        {
+            public string Name => "Broken";
+
+            public Task<IReadOnlyList<WordEntry>> QueryAsync(string word, CancellationToken cancellationToken = default)
+            {
+                throw new InvalidOperationException("source failed");
+            }
+
+            public Task<IReadOnlyList<WordEntry>> MatchAsync(string word, int limit, CancellationToken cancellationToken = default)
+            {
+                throw new InvalidOperationException("source failed");
+            }
+
+            public Task<IReadOnlyList<WordEntry>> PatternAsync(string pattern, int limit, CancellationToken cancellationToken = default)
+            {
+                throw new InvalidOperationException("source failed");
+            }
+        }
+
         private sealed class FakeWordSource : IWordSource
         {
             private readonly IReadOnlyList<WordEntry> _entries;

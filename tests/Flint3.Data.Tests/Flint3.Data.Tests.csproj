@@ -15,4 +15,8 @@
     <ItemGroup>
         <ProjectReference Include="..\..\Flint3.Data\Flint3.Data.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Fixtures\**\*.mdx" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
 </Project>

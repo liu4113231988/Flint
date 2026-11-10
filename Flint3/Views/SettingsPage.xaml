@@ -12,6 +12,7 @@
     xmlns:ui="using:CommunityToolkit.WinUI.UI" 
     xmlns:cvt="using:Flint3.Converters"
     xmlns:control="using:Flint3.Controls.ShortcutControl"
+    xmlns:mdx="using:Flint3.Data.Mdx"
     xmlns:labs="using:CommunityToolkit.WinUI.Controls"
     Background="Transparent" NavigationCacheMode="Disabled">
     <Page.Resources>
@@ -277,6 +278,68 @@
                 </labs:SettingsCard>
 
                 <TextBlock x:Name="SearchSettingsHeaderTextBlock" x:Load="True" Text="搜索" Margin="20,12,0,8" FontWeight="Bold" FontSize="14"/>
+
+                <!--mdx 词库-->
+                <labs:SettingsExpander x:Name="DictionarySettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch" IsExpanded="False">
+                    <labs:SettingsExpander.HeaderIcon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8F1;"/>
+                    </labs:SettingsExpander.HeaderIcon>
+                    <labs:SettingsExpander.Header>
+                        <TextBlock Text="mdx 词库"/>
+                    </labs:SettingsExpander.Header>
+                    <labs:SettingsExpander.Description>
+                        <TextBlock x:Name="DictionarySummaryTextBlock" Text="导入 mdx 词库以扩展查词结果"/>
+                    </labs:SettingsExpander.Description>
+                    <labs:SettingsExpander.Items>
+                        <labs:SettingsCard HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ContentAlignment="Vertical">
+                            <StackPanel Orientation="Vertical" Spacing="8" HorizontalAlignment="Stretch">
+                                <TextBlock x:Name="DictionaryEmptyTextBlock" Text="还没有导入 mdx 词库" FontSize="12" Opacity="0.6"/>
+                                <ListView x:Name="DictionaryListView" Background="Transparent" Padding="0" HorizontalAlignment="Stretch" SelectionMode="None" ScrollViewer.VerticalScrollMode="Disabled">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="MinHeight" Value="0"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="mdx:MdxDictionaryInfo">
+                                            <Grid ColumnSpacing="8" Padding="0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                                        <TextBlock Text="{x:Bind EntryCount}" FontSize="12" Opacity="0.6"/>
+                                                        <TextBlock Text="个词条" FontSize="12" Opacity="0.6"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <ToggleSwitch Grid.Column="1" MinWidth="0" Background="Transparent" VerticalAlignment="Center"
+                                                              IsOn="{x:Bind Enabled,Mode=OneWay}" Tag="{x:Bind Id}" Toggled="OnDictionaryEnabledToggled"/>
+                                                <Button Grid.Column="2" Height="32" Width="32" Padding="0" Background="Transparent" Tag="{x:Bind Id}"
+                                                        Click="OnClickRemoveDictionary" ToolTipService.ToolTip="删除词库">
+                                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE74D;" FontSize="14"/>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                                <ProgressBar x:Name="ImportProgressBar" Maximum="100" Visibility="Collapsed"/>
+                                <InfoBar x:Name="DictionaryInfoBar" IsOpen="False" IsClosable="True"/>
+                                <Button x:Name="ImportDictionaryButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="OnClickImportDictionary">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8E5;" FontSize="14"/>
+                                        <TextBlock Text="导入 mdx 词库" FontSize="13"/>
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="暂不支持加密、LZO 压缩以及非 UTF-8/UTF-16 编码的词库" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </labs:SettingsCard>
+                    </labs:SettingsExpander.Items>
+                </labs:SettingsExpander>
 
                 <!--搜索框样式设置-->
                 <labs:SettingsExpander x:Name="SearchBoxSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch" IsExpanded="False">

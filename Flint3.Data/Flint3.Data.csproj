@@ -14,6 +14,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Flint3.Core\Flint3.Core.csproj" />
+        <ProjectReference Include="..\Flint3.Dict\Flint3.Dict.csproj" />
     </ItemGroup>
 
     <ItemGroup>

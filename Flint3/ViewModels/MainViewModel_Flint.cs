@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flint3.Core.Query;
 using Flint3.Data;
+using Flint3.Data.Mdx;
 using Flint3.Data.Models;
 using Flint3.Data.Sources;
 
@@ -17,9 +18,33 @@ namespace Flint3.ViewModels
         [System.Text.RegularExpressions.GeneratedRegex(@"[^\w]*")]
         private static partial System.Text.RegularExpressions.Regex WordSearchRegex();
 
-        private readonly WordQueryService _wordQueryService = new(new IWordSource[] { new EcdictSource() });
+        private readonly MdxDictionaryStore _mdxDictionaryStore = new();
+
+        private WordQueryService _wordQueryService;
 
         private readonly SearchCoordinator _searchCoordinator = new();
+
+        /// <summary>
+        /// mdx 词库的导入、删除与启用开关都由设置页经此访问
+        /// </summary>
+        public MdxDictionaryStore DictionaryStore => _mdxDictionaryStore;
+
+        /// <summary>
+        /// 词典列表变化后重建查询源，并释放旧源持有的文件句柄
+        /// </summary>
+        public void RefreshDictionarySources()
+        {
+            WordQueryService previous = _wordQueryService;
+            _wordQueryService = CreateQueryService();
+            previous.Dispose();
+        }
+
+        private WordQueryService CreateQueryService()
+        {
+            List<IWordSource> sources = [new EcdictSource()];
+            sources.AddRange(_mdxDictionaryStore.CreateSources());
+            return new WordQueryService(sources);
+        }
 
         /// <summary>
         /// 查词结果
@@ -36,6 +61,8 @@ namespace Flint3.ViewModels
         /// </summary>
         private void InitViewModel4Flint()
         {
+            _wordQueryService = CreateQueryService();
+
             // 预热数据库连接；查询方法会等待同一个初始化任务，避免启动后立即输入时查不到词
             _ = StarDictDataAccess.InitializeDatabase();
         }
