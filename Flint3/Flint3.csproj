@@ -20,6 +20,8 @@
         <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
         <SelfContained>true</SelfContained>
         <WindowsPackageType>None</WindowsPackageType>
+        <!-- 卫星程序集只保留中英；WinUI 的 .mui 语言目录由下面的目标单独过滤 -->
+        <SatelliteResourceLanguages>en;en-US;en-GB;zh;zh-Hans;zh-Hant;zh-CN;zh-TW</SatelliteResourceLanguages>
     </PropertyGroup>
     <ItemGroup>
         <None Remove="Assets\flint_logo_background_dark.png" />
@@ -100,6 +102,20 @@
                 <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
                 <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
             </ResolvedFileToPublish>
+        </ItemGroup>
+    </Target>
+
+    <!--
+      WindowsAppSDK 自包含负载会把 WinUI 的 .mui 按语言目录直接拷到输出，这些是内容项而不是卫星程序集，
+      SatelliteResourceLanguages 过滤不到，所以单独剔除中英以外的语言目录。
+    -->
+    <Target Name="FilterWinUILocalizedResources"
+            DependsOnTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromMsix;AddMicrosoftWindowsAppSDKPayloadFilesFromComponents"
+            BeforeTargets="AssignTargetPaths;CoreCompile">
+        <ItemGroup>
+            <_FlintExcludedWinUIResource Include="@(None)"
+                Condition="'%(None.Link)' != '' and $([System.Text.RegularExpressions.Regex]::IsMatch('%(None.Link)', '^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*[\\/]')) and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(None.Link)', '^(zh|en)([-\\/])'))" />
+            <None Remove="@(_FlintExcludedWinUIResource)" />
         </ItemGroup>
     </Target>
 

@@ -69,6 +69,7 @@ dotnet publish Flint3\Flint3.csproj -c Release -r win-x64 -p:Platform=x64 `
 
 - UI 发布目录可直接拷贝运行；`PublishTrimmed` 必须保持 `false`（WinUI 3 不支持裁剪，见 AOT 口径 L1）
 - 发布产物必须包含 `Assets/`、`*.xbf` 和 `Flint3.pri`：前两者缺失会导致启动后无窗口，`.pri` 缺失会引发资源查找失败。`Flint3.csproj` 里的 `IncludeWinUIXamlArtifactsInPublish` 目标负责把它们补进发布项
+- 语言资源只保留中英：`SatelliteResourceLanguages` 负责卫星程序集；WinUI 自包含负载的 `*.mui` 是按语言目录直接拷贝的内容项，由 `FilterWinUILocalizedResources` 目标剔除。`*.pri` 是单一资源映射（只声明语言限定符，无按语言分叉的资源），不需要裁剪
 - 实测数据（启动耗时、内存、体积）见 [aot-report.md](aot-report.md)
 
 ## 6. 常见问题
