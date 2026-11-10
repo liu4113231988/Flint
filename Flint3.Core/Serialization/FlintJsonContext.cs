@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Flint3.Core.Input;
+using Flint3.Core.Wordle;
 
 namespace Flint3.Core.Serialization
 {
@@ -9,6 +10,8 @@ namespace Flint3.Core.Serialization
     /// </summary>
     [JsonSerializable(typeof(HotkeySettings))]
     [JsonSerializable(typeof(Dictionary<string, string>))]
+    [JsonSerializable(typeof(WordleWordList))]
+    [JsonSerializable(typeof(WordleState))]
     public partial class FlintJsonContext : JsonSerializerContext
     {
     }

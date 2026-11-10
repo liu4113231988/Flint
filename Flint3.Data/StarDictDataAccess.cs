@@ -153,17 +153,28 @@ namespace Flint3.Data
         }
 
         /// <summary>
-        /// 按 SQL LIKE 模式匹配单词；模式形态由调用方约束，后续接入 wordle 时再收紧
+        /// 按 LIKE 模式匹配单词；定长模式额外加 length 过滤，避免全表扫描后排序
         /// </summary>
-        public static async Task<List<StarDictWordItem>> PatternWord(string pattern, int limit, CancellationToken cancellationToken = default)
+        /// <param name="pattern">已翻译好的 SQL LIKE 模式</param>
+        /// <param name="exactLength">模式的定长约束，null 表示不限长度</param>
+        /// <param name="limit">查询结果条数限制</param>
+        /// <param name="cancellationToken"></param>
+        public static async Task<List<StarDictWordItem>> PatternWord(string pattern, int? exactLength, int limit, CancellationToken cancellationToken = default)
         {
             try
             {
                 using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
                 List<StarDictWordItem> results = [];
-                using SqliteCommand selectCommand = new($"select * from stardict where word like $pattern order by word collate nocase limit $limit", connection);
+                string sql = exactLength.HasValue
+                    ? $"select * from stardict where word like $pattern and length(word) = $length order by word collate nocase limit $limit"
+                    : $"select * from stardict where word like $pattern order by word collate nocase limit $limit";
+                using SqliteCommand selectCommand = new(sql, connection);
                 selectCommand.Parameters.AddWithValue("$pattern", pattern);
+                if (exactLength.HasValue)
+                {
+                    selectCommand.Parameters.AddWithValue("$length", exactLength.Value);
+                }
                 selectCommand.Parameters.AddWithValue("$limit", limit);
                 using SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)

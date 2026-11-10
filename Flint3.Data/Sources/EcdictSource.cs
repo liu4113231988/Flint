@@ -25,7 +25,14 @@ namespace Flint3.Data.Sources
 
         public async Task<IReadOnlyList<WordEntry>> PatternAsync(string pattern, int limit, CancellationToken cancellationToken = default)
         {
-            return Map(await StarDictDataAccess.PatternWord(pattern, limit, cancellationToken).ConfigureAwait(false));
+            if (!WordPattern.TryTranslate(pattern, out WordPattern translated))
+            {
+                return [];
+            }
+
+            return Map(await StarDictDataAccess
+                .PatternWord(translated.Like, translated.ExactLength, limit, cancellationToken)
+                .ConfigureAwait(false));
         }
 
         private IReadOnlyList<WordEntry> Map(List<StarDictWordItem> items)

@@ -72,7 +72,13 @@ namespace Flint3.Core.Query
                 source => source.PatternAsync(pattern, limit, cancellationToken),
                 cancellationToken).ConfigureAwait(false);
 
-            return merged;
+            // 模式也跨源去重；纯字面量模式（无通配符且整词匹配）沿用精确 > 前缀 > 其他的排序契约
+            if (WordPattern.TryTranslate(pattern, out WordPattern translated) && translated.IsLiteral)
+            {
+                return Rank(merged, translated.Literal);
+            }
+
+            return Dedupe(merged);
         }
 
         private async Task<List<WordEntry>> CollectAsync(
@@ -156,6 +162,25 @@ namespace Flint3.Core.Query
             }
 
             return ranked;
+        }
+
+        /// <summary>
+        /// 保持源顺序去重，模式查询没有可比较的“查询词”，不参与精确/前缀分组
+        /// </summary>
+        private static IReadOnlyList<WordEntry> Dedupe(List<WordEntry> entries)
+        {
+            List<WordEntry> deduped = [];
+            HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (WordEntry entry in entries)
+            {
+                if (seen.Add(entry.Word))
+                {
+                    deduped.Add(entry);
+                }
+            }
+
+            return deduped;
         }
 
         private static int GroupOf(string entryWord, string query)

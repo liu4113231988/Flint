@@ -85,6 +85,16 @@ namespace Flint3.Views
         }
 
         /// <summary>
+        /// 前往 Wordle 页面
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void OnClickWordle(object sender, RoutedEventArgs e)
+        {
+            this.Frame.Navigate(typeof(WordlePage));
+        }
+
+        /// <summary>
         /// 点击置顶窗口
         /// </summary>
         /// <param name="sender"></param>

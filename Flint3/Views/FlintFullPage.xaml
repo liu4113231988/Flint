@@ -146,8 +146,9 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Rectangle Grid.ColumnSpan="5" Height="1" HorizontalAlignment="Stretch" VerticalAlignment="Top" Fill="{ThemeResource ControlElevationBorderBrush}"/>
+            <Rectangle Grid.ColumnSpan="6" Height="1" HorizontalAlignment="Stretch" VerticalAlignment="Top" Fill="{ThemeResource ControlElevationBorderBrush}"/>
 
             <!--设置按钮-->
             <Button x:Name="SettingsButton" Grid.Column="0" Margin="8,8,0,8" Background="Transparent" BorderBrush="Transparent" VerticalAlignment="Center" Click="OnClickSettingsButton">
@@ -179,8 +180,23 @@
                 </StackPanel>
             </Button>
 
+            <!--Wordle 按钮-->
+            <Button x:Name="WordleButton" Grid.Column="3" Margin="4,8,0,8" Background="Transparent" BorderBrush="Transparent" VerticalAlignment="Center" Click="OnClickWordle">
+                <ToolTipService.ToolTip>
+                    <ToolTip>
+                        <TextBlock>
+                            <Run Text="wordle" FontWeight="Bold"/>
+                            <Run Text="/ˈwɜː.dəl/"/>
+                            <Run Text="noun" FontStyle="Italic" FontWeight="Medium"/>
+                            <Run Text="猜单词"/>
+                        </TextBlock>
+                    </ToolTip>
+                </ToolTipService.ToolTip>
+                <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE7FC;" FontSize="16" Height="22" Width="22" Opacity="0.8"/>
+            </Button>
+
             <!--生词本按钮-->
-            <Button x:Name="GlossaryButton" Grid.Column="3" Margin="4,8,0,8" Background="Transparent" BorderBrush="Transparent" VerticalAlignment="Center" Click="OnClickGlossary"
+            <Button x:Name="GlossaryButton" Grid.Column="4" Margin="4,8,0,8" Background="Transparent" BorderBrush="Transparent" VerticalAlignment="Center" Click="OnClickGlossary"
                     Visibility="{x:Bind ViewModel.AppSettings.EnableGlossary,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
                 <ToolTipService.ToolTip>
                     <ToolTip>
@@ -196,7 +212,7 @@
             </Button>
 
             <!--置顶按钮-->
-            <ToggleButton x:Name="PinToggleButton" Grid.Column="4" Margin="4,8,8,8" IsChecked="False" Background="Transparent" BorderBrush="Transparent" VerticalAlignment="Center" Click="OnClickPin">
+            <ToggleButton x:Name="PinToggleButton" Grid.Column="5" Margin="4,8,8,8" IsChecked="False" Background="Transparent" BorderBrush="Transparent" VerticalAlignment="Center" Click="OnClickPin">
                 <ToolTipService.ToolTip>
                     <ToolTip>
                         <TextBlock>

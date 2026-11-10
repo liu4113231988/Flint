@@ -60,10 +60,21 @@ namespace Flint3.Data.Mdx
 
         public async Task<IReadOnlyList<WordEntry>> PatternAsync(string pattern, int limit, CancellationToken cancellationToken = default)
         {
-            const string sql = "SELECT word, record_offset FROM words WHERE word_lower LIKE $pattern ORDER BY word_lower, word LIMIT $limit;";
+            if (!WordPattern.TryTranslate(pattern, out WordPattern translated))
+            {
+                return [];
+            }
+
+            string sql = translated.ExactLength.HasValue
+                ? "SELECT word, record_offset FROM words WHERE word_lower LIKE $pattern AND length(word) = $length ORDER BY word_lower, word LIMIT $limit;"
+                : "SELECT word, record_offset FROM words WHERE word_lower LIKE $pattern ORDER BY word_lower, word LIMIT $limit;";
             List<WordRow> rows = await ReadRowsAsync(sql, command =>
             {
-                command.Parameters.AddWithValue("$pattern", pattern.ToLowerInvariant());
+                command.Parameters.AddWithValue("$pattern", translated.Like.ToLowerInvariant());
+                if (translated.ExactLength.HasValue)
+                {
+                    command.Parameters.AddWithValue("$length", translated.ExactLength.Value);
+                }
                 command.Parameters.AddWithValue("$limit", limit);
             }, cancellationToken).ConfigureAwait(false);
 

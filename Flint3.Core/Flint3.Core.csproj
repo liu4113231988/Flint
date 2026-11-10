@@ -15,4 +15,9 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
     </ItemGroup>
+
+    <ItemGroup>
+        <!-- 由 tools 脚本从 ECDICT 预生成的 Wordle 词表，运行时不扫库 -->
+        <EmbeddedResource Include="Wordle\wordle_words.json" />
+    </ItemGroup>
 </Project>

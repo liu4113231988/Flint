@@ -122,6 +122,41 @@ namespace Flint3.Core.Tests
             Assert.Equal(new[] { "apple" }, words);
         }
 
+        [Fact]
+        public async Task PatternAsync_跨源去重保留先出现的源()
+        {
+            var first = new FakeWordSource("First", new WordEntry { Word = "cake", Translation = "first" });
+            var second = new FakeWordSource("Second", new WordEntry { Word = "CAKE", Translation = "second" });
+            var service = new WordQueryService(new IWordSource[] { first, second });
+
+            var result = await service.PatternAsync("?a?e", 10);
+
+            var entry = Assert.Single(result);
+            Assert.Equal("First", entry.Source);
+        }
+
+        [Fact]
+        public async Task PatternAsync_字面量模式沿用精确优先排序()
+        {
+            var source = new FakeWordSource("Ecdict", "appendix", "apple");
+            var service = new WordQueryService(new IWordSource[] { source });
+
+            var words = (await service.PatternAsync("^apple$", 10)).Select(x => x.Word);
+
+            Assert.Equal(new[] { "apple", "appendix" }, words);
+        }
+
+        [Fact]
+        public async Task PatternAsync_通配符模式保持源顺序()
+        {
+            var source = new FakeWordSource("Ecdict", "banana", "apple");
+            var service = new WordQueryService(new IWordSource[] { source });
+
+            var words = (await service.PatternAsync("?a?e", 10)).Select(x => x.Word);
+
+            Assert.Equal(new[] { "banana", "apple" }, words);
+        }
+
         private sealed class ThrowingSource : IWordSource
         {
             public string Name => "Broken";

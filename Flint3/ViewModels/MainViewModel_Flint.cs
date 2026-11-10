@@ -15,6 +15,8 @@ namespace Flint3.ViewModels
     {
         private const int SearchDebounceMilliseconds = 300;
 
+        private const int PatternSearchLimit = 40;
+
         [System.Text.RegularExpressions.GeneratedRegex(@"[^\w]*")]
         private static partial System.Text.RegularExpressions.Regex WordSearchRegex();
 
@@ -68,7 +70,8 @@ namespace Flint3.ViewModels
         }
 
         /// <summary>
-        /// 查找模糊匹配的多个单词：新输入会取消上一次请求，延迟 300ms 后只保留最后一次结果
+        /// 查找模糊匹配的多个单词：新输入会取消上一次请求，延迟 300ms 后只保留最后一次结果。
+        /// 输入含通配符语法（<c>?</c> / <c>*</c> / <c>_</c> / <c>^</c> / <c>$</c>）时改走模式查询。
         /// </summary>
         /// <param name="word"></param>
         public void MatchWord(string word, bool searchingFromMain, int limit = 10)
@@ -82,7 +85,37 @@ namespace Flint3.ViewModels
                 return;
             }
 
+            string trimmed = word.Trim();
+            if (IsPatternInput(trimmed))
+            {
+                _ = SearchPatternAsync(trimmed, wordsCollection, PatternSearchLimit, request);
+                return;
+            }
+
             _ = SearchWordAsync(WordSearchRegex().Replace(word, ""), wordsCollection, limit, request);
+        }
+
+        /// <summary>
+        /// 通配符输入不能交给 WordSearchRegex 清洗，否则 ? 与 * 会被直接删掉
+        /// </summary>
+        private static bool IsPatternInput(string input)
+        {
+            return input.IndexOfAny(['?', '*', '_', '^', '$']) >= 0;
+        }
+
+        private async Task SearchPatternAsync(string pattern, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request)
+        {
+            try
+            {
+                await Task.Delay(SearchDebounceMilliseconds, request.Token);
+
+                IReadOnlyList<WordEntry> entries = await _wordQueryService.PatternAsync(pattern, limit, request.Token);
+                request.Token.ThrowIfCancellationRequested();
+
+                PublishResults(wordsCollection, entries, request.Sequence);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
         }
 
         private async Task SearchWordAsync(string word, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request)
