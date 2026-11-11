@@ -19,6 +19,9 @@ namespace Flint3.Data.Mdx
     {
         private const string SettingsFileName = "dictionarySources.json";
 
+        // 复制阶段占总进度的前 15%，其余留给索引构建
+        private const double CopyProgressShare = 0.15;
+
         private readonly string _baseDirectory;
 
         private readonly ConcurrentDictionary<string, byte> _upgrading = new();
@@ -102,11 +105,15 @@ namespace Flint3.Data.Mdx
             {
                 if (!string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    File.Copy(sourcePath, targetPath, overwrite: true);
+                    await CopyFileAsync(sourcePath, targetPath, progress, cancellationToken).ConfigureAwait(false);
                 }
 
+                IProgress<double>? indexProgress = progress is null
+                    ? null
+                    : new ScaledProgress(progress, CopyProgressShare, 1 - CopyProgressShare);
+
                 long entryCount = await Task.Run(
-                    () => MdxIndexDatabase.Build(targetPath, indexPath, progress, cancellationToken),
+                    () => MdxIndexDatabase.Build(targetPath, indexPath, indexProgress, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
 
                 MdxDictionaryInfo info = new()
@@ -239,11 +246,55 @@ namespace Flint3.Data.Mdx
             File.Move(tempPath, SettingsPath, overwrite: true);
         }
 
+        /// <summary>
+        /// 分块异步复制，避免大文件在 UI 线程上同步拷贝时卡住，并按块响应取消
+        /// </summary>
+        private static async Task CopyFileAsync(
+            string sourcePath,
+            string targetPath,
+            IProgress<double>? progress,
+            CancellationToken cancellationToken)
+        {
+            const int BufferSize = 1024 * 1024;
+            await using FileStream source = new(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
+            await using FileStream target = new(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, useAsync: true);
+
+            long total = source.Length;
+            long copied = 0;
+            byte[] buffer = new byte[BufferSize];
+            int read;
+            while ((read = await source.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                copied += read;
+                progress?.Report(total > 0 ? CopyProgressShare * copied / total : 0);
+            }
+        }
+
         private static async Task<string> ComputeIdAsync(string path, CancellationToken cancellationToken)
         {
             await using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
             byte[] hash = await SHA1.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
             return Convert.ToHexString(hash)[..12].ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// 同步转发并做区间缩放，保持索引构建的 0~1 进度落在总进度的后 85%
+        /// </summary>
+        private sealed class ScaledProgress : IProgress<double>
+        {
+            private readonly IProgress<double> _inner;
+            private readonly double _offset;
+            private readonly double _scale;
+
+            public ScaledProgress(IProgress<double> inner, double offset, double scale)
+            {
+                _inner = inner;
+                _offset = offset;
+                _scale = scale;
+            }
+
+            public void Report(double value) => _inner.Report(_offset + (_scale * value));
         }
 
         private static void TryDelete(string path)

@@ -329,12 +329,20 @@
                                 </ListView>
                                 <ProgressBar x:Name="ImportProgressBar" Maximum="100" Visibility="Collapsed"/>
                                 <InfoBar x:Name="DictionaryInfoBar" IsOpen="False" IsClosable="True"/>
-                                <Button x:Name="ImportDictionaryButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="OnClickImportDictionary">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8E5;" FontSize="14"/>
-                                        <TextBlock Text="导入 mdx 词库" FontSize="13"/>
-                                    </StackPanel>
-                                </Button>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="ImportDictionaryButton" Grid.Column="0" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="OnClickImportDictionary">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8E5;" FontSize="14"/>
+                                            <TextBlock Text="导入 mdx 词库" FontSize="13"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="CancelImportDictionaryButton" Grid.Column="1" Height="34" Padding="12,0" VerticalAlignment="Center"
+                                            Content="取消" Visibility="Collapsed" Click="OnClickCancelImportDictionary"/>
+                                </Grid>
                                 <TextBlock Text="暂不支持加密、LZO 压缩以及非 UTF-8/UTF-16 编码的词库" FontSize="12" Opacity="0.6" TextWrapping="Wrap"/>
                             </StackPanel>
                         </labs:SettingsCard>

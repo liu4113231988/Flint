@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using Flint3.Data.Mdx;
 using Flint3.Dict;
 using Flint3.Helpers;
@@ -28,6 +29,8 @@ namespace Flint3.Views
 
         // 代码回填开关状态时会触发 Toggled，避免把读取当成用户操作
         private bool _updatingStartupState;
+
+        private CancellationTokenSource? _importCancellation;
 
         public SettingsPage()
         {
@@ -84,18 +87,26 @@ namespace Flint3.Views
             }
 
             ImportDictionaryButton.IsEnabled = false;
+            CancelImportDictionaryButton.Visibility = Visibility.Visible;
             ImportProgressBar.Visibility = Visibility.Visible;
             ImportProgressBar.Value = 0;
             DictionaryInfoBar.IsOpen = false;
 
+            using CancellationTokenSource cancellation = new();
+            _importCancellation = cancellation;
+
             try
             {
                 Progress<double> progress = new(value => ImportProgressBar.Value = value * 100);
-                MdxDictionaryInfo info = await _viewModel.DictionaryStore.ImportAsync(file.Path, progress);
+                MdxDictionaryInfo info = await _viewModel.DictionaryStore.ImportAsync(file.Path, progress, cancellation.Token);
 
                 LoadDictionaries();
                 _viewModel.RefreshDictionarySources();
                 ShowDictionaryMessage($"已导入「{info.Name}」，共 {info.EntryCount} 个词条", InfoBarSeverity.Success);
+            }
+            catch (OperationCanceledException)
+            {
+                ShowDictionaryMessage("已取消导入", InfoBarSeverity.Informational);
             }
             catch (MdxUnsupportedException ex)
             {
@@ -108,9 +119,16 @@ namespace Flint3.Views
             }
             finally
             {
+                _importCancellation = null;
                 ImportDictionaryButton.IsEnabled = true;
+                CancelImportDictionaryButton.Visibility = Visibility.Collapsed;
                 ImportProgressBar.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private void OnClickCancelImportDictionary(object sender, RoutedEventArgs e)
+        {
+            _importCancellation?.Cancel();
         }
 
         /// <summary>

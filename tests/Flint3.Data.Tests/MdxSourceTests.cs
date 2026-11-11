@@ -74,6 +74,34 @@ namespace Flint3.Data.Tests
         }
 
         [Fact]
+        public async Task 导入前已取消时不留文件与登记()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            using CancellationTokenSource cancellation = new();
+            cancellation.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => store.ImportAsync(Fixture("basic.mdx"), cancellationToken: cancellation.Token));
+
+            Assert.Empty(store.Load().Dictionaries);
+            Assert.False(Directory.Exists(store.DictionariesDirectory) && Directory.EnumerateFiles(store.DictionariesDirectory).Any());
+        }
+
+        [Fact]
+        public async Task 导入过程中取消会清理半成品()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            using CancellationTokenSource cancellation = new();
+            CancelOnFirstProgress progress = new(cancellation);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => store.ImportAsync(Fixture("basic.mdx"), progress, cancellation.Token));
+
+            Assert.Empty(store.Load().Dictionaries);
+            Assert.False(Directory.Exists(store.DictionariesDirectory) && Directory.EnumerateFiles(store.DictionariesDirectory).Any());
+        }
+
+        [Fact]
         public async Task 导入加密词库时报明确错误且不留下文件()
         {
             MdxDictionaryStore store = new(_baseDirectory);
@@ -254,6 +282,14 @@ namespace Flint3.Data.Tests
 
             public Task<IReadOnlyList<WordEntry>> PatternAsync(string pattern, int limit, CancellationToken cancellationToken = default)
                 => QueryAsync(pattern, cancellationToken);
+        }
+
+        /// <summary>
+        /// 首次进度回调就取消，用于验证导入中途取消的清理路径
+        /// </summary>
+        private sealed class CancelOnFirstProgress(CancellationTokenSource cancellation) : IProgress<double>
+        {
+            public void Report(double value) => cancellation.Cancel();
         }
     }
 }
