@@ -47,7 +47,7 @@
 
 #### 构建、测试与数据准备
 
-见 [docs/build.md](docs/build.md)。简要命令：
+见 [docs/build.md](docs/build.md)。仓库分发的词典数据为 `stardict.csf` 分卷（约 121 MB）与中文反查索引 `stardict.zhx.7z`（31.83 MB，约增加 26% 的 clone 体积），执行 `prepare-data.ps1` 后会解压到 `Flint3/Data` 并校验 SHA256。简要命令：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1

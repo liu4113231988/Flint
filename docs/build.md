@@ -9,13 +9,13 @@
 
 ## 1. 准备词典数据
 
-`Flint3/Data/stardict.csf` 是 CSF 只读词典（115.58 MiB），仓库按 95 MiB 分卷保存为 `stardict.csf.7z.001/002`；`stardict.db`（ECDICT 源库，约 812 MB）不再随仓库分发。`Flint3/Data/stardict.zhx` 是中文反查的旁挂索引（75.92 MB，7z 约 31.83 MB），由 `zhbuild` 从源库派生，不属于 CSF 格式的一部分。
+`Flint3/Data/stardict.csf` 是 CSF 只读词典（115.58 MiB），仓库按 95 MiB 分卷保存为 `stardict.csf.7z.001/002`；`stardict.db`（ECDICT 源库，约 812 MB）不再随仓库分发。`Flint3/Data/stardict.zhx` 是中文反查的旁挂索引（75.92 MB），以单卷 `stardict.zhx.7z`（31.83 MB）随仓库分发，由 `zhbuild` 从源库派生，不属于 CSF 格式的一部分。两者合计约 153 MB，比仅有 csf 分卷时增加约 26%。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1
 ```
 
-脚本会解出 `stardict.csf` 并校验 SHA256；本地存在 `stardict.db` 时还会与 SQLite 逐条对拍。`-Force` 强制重新解压，`-SkipVerify` 跳过对拍。`stardict.zhx` 有分卷时一并解压；没有时直接跳过，中文反查降级为无结果，英文查词不受影响。若需从源库重建（CSF 或中文索引格式变更），先从 ECDICT 上游获取 `stardict.db` 放入 `Flint3/Data`，再运行 `-Rebuild`，会同时重建 `stardict.csf` 与 `stardict.zhx`。
+脚本会解出 `stardict.csf` 并校验 SHA256；本地存在 `stardict.db` 时还会与 SQLite 逐条对拍。`-Force` 强制重新解压，`-SkipVerify` 跳过对拍。`stardict.zhx` 同样从 `stardict.zhx.7z` 解出并校验 SHA256；已存在的索引摘要不符会自动重解，压缩包与索引都不存在时跳过，中文反查降级为无结果，英文查词不受影响。若需从源库重建（CSF 或中文索引格式变更），先从 ECDICT 上游获取 `stardict.db` 放入 `Flint3/Data`，再运行 `-Rebuild`，会同时重建 `stardict.csf` 与 `stardict.zhx`（重建后需自行重新打包分卷）。
 
 ## 2. 构建
 

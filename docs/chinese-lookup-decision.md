@@ -269,7 +269,7 @@ LIKE 全表扫描对照（热缓存，本机）：
 与 §5.1 的差异：
 - 文件名用 `stardict.zhx`（更短，便于与 `stardict.csf` 并排）。
 - 索引里不存记录 id 而存全局排名，查询侧归并时无需回读记录即可得到契约顺序，也让排序契约可以被单测固定。
-- `stardict.zhx` 当前**未入库**：7z 31.83 MB 会让 clone 体积增加约 25%（相对现有 csf 分卷 121 MB）。`prepare-data.ps1` 已支持“有分卷则解压、缺失则跳过”，是否入库待定。
+- `stardict.zhx` 已**随仓库分发**（单卷 `stardict.zhx.7z`，31.83 MB）：解压后 75.92 MB 的 `stardict.zhx` 仍按派生物处理，留在 `.gitignore`。相较仅有 csf 分卷（约 121 MB），clone 体积增加约 **26%**（合计约 153 MB）。`prepare-data.ps1` 负责解压并校验 SHA256。
 - 子串（bigram）、拼音、简繁转换、分词均未做，与 §5.1 一致。
 
 ---
