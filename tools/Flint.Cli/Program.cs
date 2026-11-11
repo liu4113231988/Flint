@@ -38,12 +38,24 @@ namespace Flint.Cli
                 return await CsfCommands.BenchAsync(args[0], args[2]).ConfigureAwait(false);
             }
 
+            if (args.Length >= 3 && string.Equals(args[1], "zhbuild", StringComparison.OrdinalIgnoreCase))
+            {
+                return ChineseCommands.Build(args[0], args[2]);
+            }
+
+            if (args.Length >= 3 && string.Equals(args[1], "zhbench", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ChineseCommands.BenchAsync(args[0], args[2]).ConfigureAwait(false);
+            }
+
             if (args.Length < 3)
             {
                 Console.WriteLine("usage: Flint.Cli <dbPath> <match|query|pattern|bench> <word> [limit]");
                 Console.WriteLine("       Flint.Cli <dbPath> build <csfPath>");
                 Console.WriteLine("       Flint.Cli <dbPath> verify <csfPath> [deep]");
                 Console.WriteLine("       Flint.Cli <dbPath> csfbench <csfPath>");
+                Console.WriteLine("       Flint.Cli <dbPath> zhbuild <zhIndexPath>");
+                Console.WriteLine("       Flint.Cli <dbPath> zhbench <zhIndexPath>");
                 return 2;
             }
 
