@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flint3.Core.Query;
-using Flint3.Data;
 using Flint3.Data.Mdx;
 using Flint3.Data.Models;
 using Flint3.Data.Sources;
@@ -64,9 +63,7 @@ namespace Flint3.ViewModels
         private void InitViewModel4Flint()
         {
             _wordQueryService = CreateQueryService();
-
-            // 预热数据库连接；查询方法会等待同一个初始化任务，避免启动后立即输入时查不到词
-            _ = StarDictDataAccess.InitializeDatabase();
+            // 词库后端在首次查询时惰性创建（CSF 走 mmap，打开成本低），无需预热
         }
 
         /// <summary>
