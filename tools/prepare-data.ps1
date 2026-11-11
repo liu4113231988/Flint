@@ -13,8 +13,9 @@ $database = Join-Path $DataDir "stardict.db"
 $csf = Join-Path $DataDir "stardict.csf"
 $archive = Join-Path $DataDir "stardict.csf.7z.001"
 $zhIndex = Join-Path $DataDir "stardict.zhx"
-$zhArchive = Join-Path $DataDir "stardict.zhx.7z.001"
+$zhArchive = Join-Path $DataDir "stardict.zhx.7z"
 $expectedSha256 = "E3E22A59CA185AA507478C4332A9EBB0132B6024D5053AFFE7CA9ED42FA6D335"
+$expectedZhSha256 = "74C40D4D6E95AEE4727EF3A22C8D12C92506022645C6786FA7C2BFEA4F72B47F"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $cliProject = Join-Path $repoRoot "tools\Flint.Cli\Flint.Cli.csproj"
 
@@ -88,19 +89,39 @@ else {
         Write-Host "stardict.csf 校验通过（SHA256 $extracted）。"
     }
 
-    if (Test-Path $zhArchive) {
-        $sevenZip = Find-SevenZip
-        Write-Host "解压中文反查索引 $zhArchive 到 $DataDir ..."
-        & $sevenZip x $zhArchive "-o$DataDir" -y | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "7-Zip 解压中文反查索引失败，退出码 $LASTEXITCODE"
+    $needZhExtract = $true
+    if ((Test-Path $zhIndex) -and -not $Force) {
+        $current = (Get-FileHash $zhIndex -Algorithm SHA256).Hash
+        if ($current -eq $expectedZhSha256) {
+            Write-Host "已存在中文反查索引 stardict.zhx（$([math]::Round((Get-Item $zhIndex).Length / 1MB, 2)) MB），跳过解压。需要重新解压请加 -Force。"
+            $needZhExtract = $false
+        }
+        else {
+            Write-Host "现有 stardict.zhx 与压缩包内容不一致，重新解压。"
         }
     }
-    elseif (Test-Path $zhIndex) {
-        Write-Host "已存在中文反查索引 stardict.zhx（$([math]::Round((Get-Item $zhIndex).Length / 1MB, 2)) MB），跳过解压。"
-    }
-    else {
-        Write-Host "未找到中文反查索引（stardict.zhx 或其分卷），中文反查会降级为无结果；可用 -Rebuild 从源库生成。"
+
+    if ($needZhExtract) {
+        if (Test-Path $zhArchive) {
+            $sevenZip = Find-SevenZip
+            Write-Host "解压中文反查索引 $zhArchive 到 $DataDir ..."
+            & $sevenZip x $zhArchive "-o$DataDir" -y | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "7-Zip 解压中文反查索引失败，退出码 $LASTEXITCODE"
+            }
+
+            $extracted = (Get-FileHash $zhIndex -Algorithm SHA256).Hash
+            if ($extracted -ne $expectedZhSha256) {
+                throw "解压得到的 stardict.zhx 校验失败：期望 $expectedZhSha256，实际 $extracted"
+            }
+            Write-Host "stardict.zhx 校验通过（SHA256 $extracted）。"
+        }
+        elseif (Test-Path $zhIndex) {
+            Write-Host "缺少压缩包 $zhArchive，继续使用现有的 stardict.zhx（中文反查结果可能不准）。"
+        }
+        else {
+            Write-Host "未找到中文反查索引（stardict.zhx 或 stardict.zhx.7z），中文反查会降级为无结果；可用 -Rebuild 从源库生成。"
+        }
     }
 }
 
