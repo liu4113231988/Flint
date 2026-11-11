@@ -12,6 +12,8 @@ $DataDir = (Resolve-Path $DataDir).Path
 $database = Join-Path $DataDir "stardict.db"
 $csf = Join-Path $DataDir "stardict.csf"
 $archive = Join-Path $DataDir "stardict.csf.7z.001"
+$zhIndex = Join-Path $DataDir "stardict.zhx"
+$zhArchive = Join-Path $DataDir "stardict.zhx.7z.001"
 $expectedSha256 = "E3E22A59CA185AA507478C4332A9EBB0132B6024D5053AFFE7CA9ED42FA6D335"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $cliProject = Join-Path $repoRoot "tools\Flint.Cli\Flint.Cli.csproj"
@@ -45,6 +47,13 @@ if ($Rebuild) {
     if ($LASTEXITCODE -ne 0) {
         throw "CSF 构建失败，退出码 $LASTEXITCODE"
     }
+
+    # 中文反查索引是纯派生物，格式变更时与 csf 一起重建
+    Write-Host "从源库重建中文反查索引 ..."
+    dotnet run --project $cliProject -c Release -- $database zhbuild $zhIndex
+    if ($LASTEXITCODE -ne 0) {
+        throw "中文反查索引构建失败，退出码 $LASTEXITCODE"
+    }
 }
 else {
     $needExtract = $true
@@ -77,6 +86,21 @@ else {
             throw "解压得到的 stardict.csf 校验失败：期望 $expectedSha256，实际 $extracted"
         }
         Write-Host "stardict.csf 校验通过（SHA256 $extracted）。"
+    }
+
+    if (Test-Path $zhArchive) {
+        $sevenZip = Find-SevenZip
+        Write-Host "解压中文反查索引 $zhArchive 到 $DataDir ..."
+        & $sevenZip x $zhArchive "-o$DataDir" -y | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip 解压中文反查索引失败，退出码 $LASTEXITCODE"
+        }
+    }
+    elseif (Test-Path $zhIndex) {
+        Write-Host "已存在中文反查索引 stardict.zhx（$([math]::Round((Get-Item $zhIndex).Length / 1MB, 2)) MB），跳过解压。"
+    }
+    else {
+        Write-Host "未找到中文反查索引（stardict.zhx 或其分卷），中文反查会降级为无结果；可用 -Rebuild 从源库生成。"
     }
 }
 
