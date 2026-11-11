@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Flint3.Data.Chinese;
 using Flint3.Data.Models;
 using Flint3.Data.StarDict;
 
@@ -18,6 +19,12 @@ namespace Flint3.Data
 
     public static class StarDictDataAccess
     {
+        /// <summary>中文反查索引与 CSF/db 同目录，纯派生物；缺失只影响中文反查</summary>
+        private const string ChineseIndexFileName = "stardict.zhx";
+
+        /// <summary>精确反查没有 limit 参数（QueryAsync），用固定上限避免一个常用词把词卡撑爆</summary>
+        private const int MaxChineseExactResults = 50;
+
         private static readonly object _initializeLock = new();
 
         private static string? _databasePath = null;
@@ -25,6 +32,13 @@ namespace Flint3.Data
         private static StarDictBackendKind _backendKind = StarDictBackendKind.Auto;
 
         private static IStarDictBackend? _backend = null;
+
+        private static ChineseIndexReader? _chineseIndex = null;
+
+        private static bool _chineseSourceMismatch = false;
+
+        /// <summary>记录数只在首次反查时对一次；SQLite 下 count(*) 不便宜，不能每个按键都跑</summary>
+        private static bool _chineseSourceVerified = false;
 
         private static string DatabasePath => _databasePath ?? Path.Combine(AppContext.BaseDirectory, "Data", "stardict.db");
 
@@ -74,6 +88,11 @@ namespace Flint3.Data
         {
             _backend?.Dispose();
             _backend = null;
+
+            _chineseIndex?.Dispose();
+            _chineseIndex = null;
+            _chineseSourceMismatch = false;
+            _chineseSourceVerified = false;
         }
 
         private static IStarDictBackend GetBackend()
@@ -205,6 +224,120 @@ namespace Flint3.Data
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
             return [];
         }
+
+        #region 中文反查
+
+        /// <summary>中文反查索引的状态；未就绪时英文查词完全不受影响</summary>
+        public static ChineseIndexStatus ChineseLookupStatus
+        {
+            get
+            {
+                ChineseIndexReader index = GetChineseIndex();
+                return _chineseSourceMismatch ? ChineseIndexStatus.SourceMismatch : index.Status;
+            }
+        }
+
+        /// <summary>给界面用的可读提示；索引可用时为空串</summary>
+        public static string ChineseLookupHint
+        {
+            get
+            {
+                ChineseIndexReader index = GetChineseIndex();
+                return _chineseSourceMismatch
+                    ? "中文反查索引与当前词库记录数不一致，请重新生成索引"
+                    : index.ErrorMessage;
+            }
+        }
+
+        /// <summary>
+        /// 精确 + 前缀反查：输入"苹果"命中 apple 等，输入"应"命中"应用/应用程序"。
+        /// </summary>
+        public static Task<List<StarDictWordItem>> MatchChineseWord(string word, int limit, CancellationToken cancellationToken = default)
+        {
+            return LookupChineseAsync(word, limit, true, cancellationToken);
+        }
+
+        /// <summary>只做精确词条反查，供 QueryAsync 语义使用</summary>
+        public static Task<List<StarDictWordItem>> QueryChineseWord(string word, CancellationToken cancellationToken = default)
+        {
+            return LookupChineseAsync(word, MaxChineseExactResults, false, cancellationToken);
+        }
+
+        private static async Task<List<StarDictWordItem>> LookupChineseAsync(
+            string word,
+            int limit,
+            bool includePrefix,
+            CancellationToken cancellationToken)
+        {
+            ChineseIndexReader index = GetChineseIndex();
+            if (index.Status != ChineseIndexStatus.Ready)
+            {
+                return [];
+            }
+
+            try
+            {
+                IStarDictBackend backend = GetBackend();
+                if (!_chineseSourceVerified)
+                {
+                    int recordCount = await backend.GetRecordCount(cancellationToken).ConfigureAwait(false);
+                    // 索引不是从当前词库生成的，宁可无结果也不要回读到错位的记录
+                    _chineseSourceMismatch = recordCount != index.RecordCount;
+                    _chineseSourceVerified = true;
+                }
+
+                if (_chineseSourceMismatch)
+                {
+                    return [];
+                }
+
+                List<int> ids = includePrefix ? index.Lookup(word, limit) : index.LookupExact(word, limit);
+                if (ids.Count == 0)
+                {
+                    return [];
+                }
+
+                return await backend.GetWordsByIds(ids, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                return [];
+            }
+        }
+
+        private static ChineseIndexReader GetChineseIndex()
+        {
+            ChineseIndexReader? index = _chineseIndex;
+            if (index is not null)
+            {
+                return index;
+            }
+
+            lock (_initializeLock)
+            {
+                _chineseIndex ??= ChineseIndexReader.Open(ResolveChineseIndexPath());
+                return _chineseIndex;
+            }
+        }
+
+        private static string ResolveChineseIndexPath()
+        {
+            string? environment = Environment.GetEnvironmentVariable("FLINT_STARDICT_ZH");
+            if (!string.IsNullOrEmpty(environment))
+            {
+                return environment;
+            }
+
+            string? directory = Path.GetDirectoryName(DatabasePath);
+            return string.IsNullOrEmpty(directory) ? ChineseIndexFileName : Path.Combine(directory, ChineseIndexFileName);
+        }
+
+        #endregion
 
         #region 扩展生词本
 

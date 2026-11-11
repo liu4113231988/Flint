@@ -30,6 +30,24 @@ namespace Flint3.Data.StarDict
             return Task.FromResult(_reader.MatchWord(word, limit));
         }
 
+        public Task<List<StarDictWordItem>> GetWordsByIds(IReadOnlyList<int> ids, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            List<StarDictWordItem> results = new(ids.Count);
+            foreach (int id in ids)
+            {
+                results.Add(_reader.GetRecordById(id));
+            }
+
+            return Task.FromResult(results);
+        }
+
+        public Task<int> GetRecordCount(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_reader.RecordCount);
+        }
+
         public Task<List<StarDictWordItem>> PatternWord(string pattern, int? exactLength, int limit, CancellationToken cancellationToken)
         {
             return Task.FromResult(_reader.PatternWord(pattern, exactLength, limit, cancellationToken));

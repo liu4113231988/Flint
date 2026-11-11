@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Flint3.Data.Models;
@@ -84,6 +85,61 @@ namespace Flint3.Data.StarDict
             }
 
             return results;
+        }
+
+        public async Task<List<StarDictWordItem>> GetWordsByIds(IReadOnlyList<int> ids, CancellationToken cancellationToken)
+        {
+            List<StarDictWordItem> results = new(ids.Count);
+            if (ids.Count == 0)
+            {
+                return results;
+            }
+
+            using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            StringBuilder placeholders = new(ids.Count * 4);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (i > 0)
+                {
+                    placeholders.Append(',');
+                }
+
+                placeholders.Append("$id").Append(i);
+            }
+
+            using SqliteCommand selectCommand = new($"select * from stardict where id in ({placeholders})", connection);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                selectCommand.Parameters.AddWithValue("$id" + i, ids[i]);
+            }
+
+            Dictionary<long, StarDictWordItem> found = new(ids.Count);
+            using (SqliteDataReader query = await selectCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (await query.ReadAsync(cancellationToken).ConfigureAwait(false) == true)
+                {
+                    StarDictWordItem item = ReadWordItem(query);
+                    found[item.Id] = item;
+                }
+            }
+
+            foreach (int id in ids)
+            {
+                if (found.TryGetValue(id, out StarDictWordItem? item))
+                {
+                    results.Add(item);
+                }
+            }
+
+            return results;
+        }
+
+        public async Task<int> GetRecordCount(CancellationToken cancellationToken)
+        {
+            using SqliteConnection connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            using SqliteCommand selectCommand = new("select count(*) from stardict", connection);
+            object? value = await selectCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return value is null or DBNull ? 0 : Convert.ToInt32(value);
         }
 
         public async Task<List<StarDictWordItem>> PatternWord(string pattern, int? exactLength, int limit, CancellationToken cancellationToken)

@@ -16,6 +16,11 @@ namespace Flint3.Data.StarDict
 
         Task<List<StarDictWordItem>> PatternWord(string pattern, int? exactLength, int limit, CancellationToken cancellationToken);
 
+        /// <summary>按记录 id 批量回读，返回顺序与传入顺序一致（中文反查索引用）</summary>
+        Task<List<StarDictWordItem>> GetWordsByIds(IReadOnlyList<int> ids, CancellationToken cancellationToken);
+
+        Task<int> GetRecordCount(CancellationToken cancellationToken);
+
         Task<List<StarDictWordItem>> GetAllExtraGlossaryWords(string tag, string word, CancellationToken cancellationToken);
 
         Task<List<StarDictWordItem>> GetIncrementalExtraGlossaryWords(string tag, long startId, int limit, string word, CancellationToken cancellationToken);

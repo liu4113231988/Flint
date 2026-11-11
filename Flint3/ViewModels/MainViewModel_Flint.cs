@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flint3.Core.Query;
+using Flint3.Data;
+using Flint3.Data.Chinese;
 using Flint3.Data.Mdx;
 using Flint3.Data.Models;
 using Flint3.Data.Sources;
@@ -57,6 +59,17 @@ namespace Flint3.ViewModels
         /// </summary>
         public ObservableCollection<StarDictWordItem> LiteSearchResultWordItems { get; private set; } = new ObservableCollection<StarDictWordItem>();
 
+        private string _searchHint = string.Empty;
+
+        /// <summary>
+        /// 无结果时的可读提示（中文反查索引缺失/损坏时说明原因），有结果时为空
+        /// </summary>
+        public string SearchHint
+        {
+            get => _searchHint;
+            private set => SetProperty(ref _searchHint, value);
+        }
+
         /// <summary>
         /// 进行对单词搜索相关的初始化
         /// </summary>
@@ -75,6 +88,7 @@ namespace Flint3.ViewModels
         {
             ObservableCollection<StarDictWordItem> wordsCollection = searchingFromMain ? this.SearchResultWordItems : this.LiteSearchResultWordItems;
             SearchRequest request = _searchCoordinator.BeginRequest();
+            SearchHint = string.Empty;
 
             if (string.IsNullOrWhiteSpace(word))
             {
@@ -109,7 +123,7 @@ namespace Flint3.ViewModels
                 IReadOnlyList<WordEntry> entries = await _wordQueryService.PatternAsync(pattern, limit, request.Token);
                 request.Token.ThrowIfCancellationRequested();
 
-                PublishResults(wordsCollection, entries, request.Sequence);
+                PublishResults(wordsCollection, entries, request.Sequence, string.Empty);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
@@ -124,7 +138,7 @@ namespace Flint3.ViewModels
                 IReadOnlyList<WordEntry> entries = await _wordQueryService.MatchAsync(word, limit, request.Token);
                 request.Token.ThrowIfCancellationRequested();
 
-                PublishResults(wordsCollection, entries, request.Sequence);
+                PublishResults(wordsCollection, entries, request.Sequence, EmptyResultHint(word, entries.Count));
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
@@ -133,7 +147,7 @@ namespace Flint3.ViewModels
         /// <summary>
         /// 切回 UI 线程并再次校验序号，避免旧请求覆盖新结果
         /// </summary>
-        private void PublishResults(ObservableCollection<StarDictWordItem> wordsCollection, IReadOnlyList<WordEntry> entries, long sequence)
+        private void PublishResults(ObservableCollection<StarDictWordItem> wordsCollection, IReadOnlyList<WordEntry> entries, long sequence, string hint)
         {
             void Apply()
             {
@@ -147,6 +161,8 @@ namespace Flint3.ViewModels
                 {
                     wordsCollection.Add(MakeupWordItem(entry));
                 }
+
+                SearchHint = hint;
             }
 
             if (this.Dispatcher is null)
@@ -156,6 +172,21 @@ namespace Flint3.ViewModels
             }
 
             this.Dispatcher.TryEnqueue(Apply);
+        }
+
+        /// <summary>
+        /// 只为中文输入生成提示；英文查不到时保持原来的空列表+占位图，不额外打扰
+        /// </summary>
+        private static string EmptyResultHint(string word, int resultCount)
+        {
+            if (resultCount > 0 || !ChineseTermExtractor.TryNormalizeQuery(word, out _))
+            {
+                return string.Empty;
+            }
+
+            return StarDictDataAccess.ChineseLookupStatus == ChineseIndexStatus.Ready
+                ? "未找到对应的英文词"
+                : $"中文反查不可用：{StarDictDataAccess.ChineseLookupHint}";
         }
 
         /// <summary>

@@ -234,7 +234,7 @@ namespace Flint3.Data.Csf
                     int compare = CsfText.Compare(index.Key(i), key);
                     if (compare == 0)
                     {
-                        results.Add(GetRecord(index.Ids[i]));
+                        results.Add(GetRecordById(index.Ids[i]));
                         return results;
                     }
 
@@ -269,7 +269,7 @@ namespace Flint3.Data.Csf
                         continue;
                     }
 
-                    results.Add(GetRecord(index.Ids[i]));
+                    results.Add(GetRecordById(index.Ids[i]));
                 }
             }
 
@@ -291,7 +291,7 @@ namespace Flint3.Data.Csf
             {
                 foreach (int id in FindExactWord(literal))
                 {
-                    StarDictWordItem item = GetRecord(id);
+                    StarDictWordItem item = GetRecordById(id);
                     if (!exactLength.HasValue || CsfText.CountChars(FoldKey(item.Word)) == exactLength.Value)
                     {
                         results.Add(item);
@@ -337,7 +337,7 @@ namespace Flint3.Data.Csf
 
                     if (like.IsMatch(key))
                     {
-                        results.Add(GetRecord(index.Ids[i]));
+                        results.Add(GetRecordById(index.Ids[i]));
                     }
                 }
             }
@@ -448,7 +448,7 @@ namespace Flint3.Data.Csf
                         continue;
                     }
 
-                    results.Add(GetRecord(id));
+                    results.Add(GetRecordById(id));
                     if (limit > 0 && results.Count >= limit)
                     {
                         return results;
@@ -536,7 +536,8 @@ namespace Flint3.Data.Csf
 
         #region 记录与索引读取
 
-        private StarDictWordItem GetRecord(int id)
+        /// <summary>按记录 id 取单条记录，供旁挂中文索引回读英文词条</summary>
+        public StarDictWordItem GetRecordById(int id)
         {
             RecordBlock block = _threadRecordBlock ??= new RecordBlock();
             int blockIndex = (id - 1) / _recordsPerBlock;
