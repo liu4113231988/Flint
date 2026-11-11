@@ -52,6 +52,7 @@ apple,apple acid,apple a day...,apple-a-day,appleade,appleades,Apple AirPlay,App
 | CsWin32 源生成 P/Invoke | NativeAOT 编译 0 个 `IL2xxx/IL3xxx` 警告；`json` 模式调用 `KeyNameResolver` 解析出 `Win + Ctrl + A`，说明生成的 P/Invoke 未被裁剪 |
 | JSON 源生成（`FlintJsonContext`） | 均走源生成上下文，AOT 下序列化/反序列化往返成功：`{"win":true,"ctrl":true,"alt":false,"shift":false,"code":65}` |
 | SQLite 原生依赖 | `Microsoft.Data.Sqlite` 10.0.14（`SQLitePCLRaw` 2.1.13）；`e_sqlite3.dll` 自动复制到发布目录，**无需显式 `Batteries_V2.Init()`** 即可查询（bundle 的模块初始化在 AOT 下被保留） |
+| zstd 解码（`ZstdSharp.Port`） | 纯托管实现，NativeAOT 编译通过、无 IL 警告；CSF 查询在 AOT 下与 JIT 输出一致（见 [stardict-storage-analysis.md](stardict-storage-analysis.md#8145-aotl1)） |
 | 裁剪告警 | `Flint3.Core`/`Flint3.Data` 开启 `IsAotCompatible` 后构建无 IL 警告 |
 
 已知告警：AOT 发布时 `Microsoft.DotNet.ILCompiler` 10.0.13（SDK 10.0.402 自带）触发 `NU1903`（GHSA-p3jp-9v83-76w9）。它是构建期编译器工具、不进入发布产物；未显式覆盖版本以避免与 runtime pack 版本错配。

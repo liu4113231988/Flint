@@ -9,13 +9,13 @@
 
 ## 1. 准备词典数据
 
-`Flint3/Data/stardict.db` 由 ECDICT 转换而来，体积约 812 MB，不入库（见 `.gitignore`）。
+`Flint3/Data/stardict.db` 由 ECDICT 转换而来，体积约 812 MB；`Flint3/Data/stardict.csf` 是由它派生的只读查询格式（约 116 MiB），两者都不入库（见 `.gitignore`）。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1
 ```
 
-脚本会查找 `Flint3/Data/stardict.7z.001` 分卷并用 7-Zip 解压，然后校验词条数与 `sw` 索引；已存在完整数据库时跳过解压，`-Force` 可强制重新解压。
+脚本会查找 `Flint3/Data/stardict.7z.001` 分卷并用 7-Zip 解压，再构建 `stardict.csf` 并与 SQLite 逐方法对拍；已存在完整数据库时跳过解压，`-Force` 可强制重新解压与重建，`-SkipVerify` 可跳过对拍。
 
 ## 2. 构建
 
@@ -26,7 +26,7 @@ powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1
 
 - 应用为 **免打包（unpackaged）自包含** 形态：`WindowsPackageType=None`、`SelfContained`、`WindowsAppSDKSelfContained`、`RuntimeIdentifiers=win-x64`
 - 不产出 MSIX，也不需要证书签名；`Package.appxmanifest` 保留在仓库但不参与构建
-- 解压数据后，`stardict.db` 会随构建复制到输出目录的 `Data/` 下
+- 解压数据后，`stardict.db` 与 `stardict.csf`（存在时）会随构建复制到输出目录的 `Data/` 下；运行时优先使用 `stardict.csf`，缺失或损坏时回退 `stardict.db`
 - `Flint3.Core` 是纯 .NET 库（快捷键钩子、P/Invoke），Win32 API 由 CsWin32 源生成，无 C++/CLI 依赖；修改 `NativeMethods.txt` 后重新构建即可刷新签名
 
 ## 3. 运行
