@@ -76,6 +76,7 @@
         <None Remove="Data\stardict.7z.001" />
         <None Remove="Data\stardict.7z.002" />
         <None Remove="Data\stardict.db" />
+        <None Remove="Data\stardict.csf" />
         <None Remove="LiteWindow.xaml" />
         <None Remove="ThemeResource\CustomControlStyle.xaml" />
         <None Remove="ThemeResource\ThemeDictionary.xaml" />
@@ -84,6 +85,10 @@
     </ItemGroup>
     <ItemGroup>
         <Content Include="Data\stardict.db">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <!-- CSF 优先于 stardict.db 被运行时选用；文件未生成时跳过，构建仍可继续（回退 SQLite） -->
+        <Content Include="Data\stardict.csf" Condition="Exists('Data\stardict.csf')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
         <!-- WinUI 默认只把 Assets 交给 AppX 打包流程，免打包发布需要显式标记，否则运行时读不到图标等资源 -->

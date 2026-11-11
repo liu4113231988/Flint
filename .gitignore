@@ -363,4 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 
 /Flint3/Data/stardict.db
+/Flint3/Data/stardict.csf
 /nuget.exe

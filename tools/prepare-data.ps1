@@ -1,8 +1,9 @@
-﻿# 解压 ECDICT 词典库（stardict.7z.001/002 -> stardict.db）并校验
-# 用法：powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1 [-Force]
+﻿# 解压 ECDICT 词典库（stardict.7z.001/002 -> stardict.db），构建并校验 CSF 只读词典
+# 用法：powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1 [-Force] [-SkipVerify]
 param(
     [string]$DataDir = (Join-Path $PSScriptRoot "..\Flint3\Data"),
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SkipVerify
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,6 +57,36 @@ if ($size -lt $minSize) {
     throw "stardict.db 体积异常（$size 字节），可能未完整解压。"
 }
 Write-Host "stardict.db 就绪：$([math]::Round($size / 1MB, 1)) MB"
+
+# 构建 CSF 只读词典（运行时优先使用，缺失或损坏时自动回退 stardict.db）
+$csf = Join-Path $DataDir "stardict.csf"
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$cliProject = Join-Path $repoRoot "tools\Flint.Cli\Flint.Cli.csproj"
+
+$needBuild = $true
+if ((Test-Path $csf) -and -not $Force) {
+    if ((Get-Item $csf).LastWriteTimeUtc -ge (Get-Item $database).LastWriteTimeUtc) {
+        $csfSize = [math]::Round((Get-Item $csf).Length / 1MB, 2)
+        Write-Host "已存在 stardict.csf（$csfSize MB），跳过构建。需要重建请加 -Force。"
+        $needBuild = $false
+    }
+}
+
+if ($needBuild) {
+    Write-Host "构建 stardict.csf ..."
+    dotnet run --project $cliProject -c Release -- $database build $csf
+    if ($LASTEXITCODE -ne 0) {
+        throw "CSF 构建失败，退出码 $LASTEXITCODE"
+    }
+}
+
+if (-not $SkipVerify) {
+    Write-Host "对拍 CSF 与 SQLite（精确/前缀/模式/tag 计数）..."
+    dotnet run --project $cliProject -c Release -- $database verify $csf
+    if ($LASTEXITCODE -ne 0) {
+        throw "CSF 对拍失败，请勿发布该文件。"
+    }
+}
 
 # 校验词条数与索引（真实库校验用例默认跳过，这里显式指定路径运行）
 $env:FLINT_STARDICT_DB = $database

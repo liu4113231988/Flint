@@ -22,9 +22,28 @@ namespace Flint.Cli
         {
             Stopwatch total = Stopwatch.StartNew();
 
+            if (args.Length >= 3 && string.Equals(args[1], "build", StringComparison.OrdinalIgnoreCase))
+            {
+                return CsfCommands.Build(args[0], args[2]);
+            }
+
+            if (args.Length >= 3 && string.Equals(args[1], "verify", StringComparison.OrdinalIgnoreCase))
+            {
+                bool deep = args.Length > 3 && string.Equals(args[3], "deep", StringComparison.OrdinalIgnoreCase);
+                return await CsfCommands.VerifyAsync(args[0], args[2], deep).ConfigureAwait(false);
+            }
+
+            if (args.Length >= 3 && string.Equals(args[1], "csfbench", StringComparison.OrdinalIgnoreCase))
+            {
+                return await CsfCommands.BenchAsync(args[0], args[2]).ConfigureAwait(false);
+            }
+
             if (args.Length < 3)
             {
                 Console.WriteLine("usage: Flint.Cli <dbPath> <match|query|pattern|bench> <word> [limit]");
+                Console.WriteLine("       Flint.Cli <dbPath> build <csfPath>");
+                Console.WriteLine("       Flint.Cli <dbPath> verify <csfPath> [deep]");
+                Console.WriteLine("       Flint.Cli <dbPath> csfbench <csfPath>");
                 return 2;
             }
 
