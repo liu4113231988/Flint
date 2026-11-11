@@ -9,13 +9,13 @@
 
 ## 1. 准备词典数据
 
-`Flint3/Data/stardict.csf` 是 CSF 只读词典（115.58 MiB），仓库按 95 MiB 分卷保存为 `stardict.csf.7z.001/002`；`stardict.db`（ECDICT 源库，约 812 MB）不再随仓库分发。
+`Flint3/Data/stardict.csf` 是 CSF 只读词典（115.58 MiB），仓库按 95 MiB 分卷保存为 `stardict.csf.7z.001/002`；`stardict.db`（ECDICT 源库，约 812 MB）不再随仓库分发。`Flint3/Data/stardict.zhx` 是中文反查的旁挂索引（75.92 MB，7z 约 31.83 MB），由 `zhbuild` 从源库派生，不属于 CSF 格式的一部分。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1
 ```
 
-脚本会解出 `stardict.csf` 并校验 SHA256；本地存在 `stardict.db` 时还会与 SQLite 逐条对拍。`-Force` 强制重新解压，`-SkipVerify` 跳过对拍。若需从源库重建（CSF 格式变更），先从 ECDICT 上游获取 `stardict.db` 放入 `Flint3/Data`，再运行 `-Rebuild`。
+脚本会解出 `stardict.csf` 并校验 SHA256；本地存在 `stardict.db` 时还会与 SQLite 逐条对拍。`-Force` 强制重新解压，`-SkipVerify` 跳过对拍。`stardict.zhx` 有分卷时一并解压；没有时直接跳过，中文反查降级为无结果，英文查词不受影响。若需从源库重建（CSF 或中文索引格式变更），先从 ECDICT 上游获取 `stardict.db` 放入 `Flint3/Data`，再运行 `-Rebuild`，会同时重建 `stardict.csf` 与 `stardict.zhx`。
 
 ## 2. 构建
 
@@ -52,7 +52,7 @@ dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj
 ```
 
 - 核心层用例覆盖快捷键 handle 编码、`HotkeySettings` 校验/显示名、固定键盘布局下的按键名解析、模式匹配语法与 Wordle 判定
-- 数据层用例使用临时目录里的小型 fixture 库，不依赖真实 `stardict.db`
+- 数据层用例使用临时目录里的小型 fixture 库，不依赖真实 `stardict.db`；其中中文反查用例覆盖排序契约的固定期望、前缀归并去重、结果上限与索引缺失/损坏/版本不符/记录数不一致的回退
 - 真实库校验用例默认跳过；`tools/prepare-data.ps1` 会设置 `FLINT_STARDICT_DB` 单独运行它
 - `legacy/` 下的旧 UWP 工程不参与 `Flint.sln` 构建与测试，仅作历史对照
 
@@ -63,6 +63,10 @@ dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj
 dotnet publish tools\Flint.Cli\Flint.Cli.csproj -c Release -r win-x64 -p:PublishAot=true
 tools\Flint.Cli\bin\Release\net10.0-windows10.0.22000.0\win-x64\publish\Flint.Cli.exe `
     Flint3\Data\stardict.csf match apple 10
+
+# 中文反查索引：构建与基准（精确/前缀 p50/p95、索引体积）
+dotnet run --project tools\Flint.Cli -c Release -- Flint3\Data\stardict.db zhbuild Flint3\Data\stardict.zhx
+dotnet run --project tools\Flint.Cli -c Release -- Flint3\Data\stardict.csf zhbench Flint3\Data\stardict.zhx
 
 # UI：R2R + CsWinRT AOT，不裁剪
 dotnet publish Flint3\Flint3.csproj -c Release -r win-x64 -p:Platform=x64 `

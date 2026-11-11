@@ -21,6 +21,7 @@
 - [x] AOT L1：`Flint3.Core`、`Flint3.Data` 可 NativeAOT 发布，UI 使用 R2R + CsWinRT AOT（不裁剪）；整应用 NativeAOT（L2）不在本期范围
 - [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条
 - [x] 单词模式匹配（`?` / `_` 单字母、`*` 任意长度、`^` / `$` 锚定）与内置 Wordle
+- [x] 汉英反查：输入中文精确或前缀匹配英文词，旁挂索引缺失/损坏时自动降级且不影响英文查词
 - [x] 免打包下的开机自启（写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）与界面版本号
 
 #### 已知限制
@@ -30,7 +31,7 @@
 - 整应用 NativeAOT（L2）未做；UI 仍依赖 WinUI 3 的运行时，因此保留 R2R 且不裁剪
 - 没有应用内语言切换，界面语言跟随系统，且只保留中文与英文资源
 - 开机自启只支持当前用户（HKCU），不写入全局启动项
-- 暂不支持中文反查英文（计划中的中文索引尚未实现）
+- 中文反查只做精确 + 前缀：不做拼音、简繁转换与分词，子串匹配（如输入"果"查"苹果"）留待后续
 
 #### 项目结构
 
@@ -38,10 +39,10 @@
 | --- | --- |
 | `Flint3/` | WinUI 3 应用（免打包、自包含、x64） |
 | `Flint3.Core/` | 纯逻辑：查询抽象、快捷键编码、Wordle 状态机与词表 |
-| `Flint3.Data/` | 词典数据访问：CSF 只读格式（缺失时回退 SQLite）与 mdx sidecar 索引查询 |
+| `Flint3.Data/` | 词典数据访问：CSF 只读格式（缺失时回退 SQLite）、中文反查旁挂索引与 mdx sidecar 索引查询 |
 | `Flint3.Dict/` | mdx 格式解析与索引构建 |
 | `tests/` | Core / Data / Dict 三套 xunit 用例 |
-| `tools/` | 数据准备、CSF 构建/校验 CLI 与 Wordle 词表生成脚本 |
+| `tools/` | 数据准备、CSF 构建/校验、中文反查索引构建/基准 CLI 与 Wordle 词表生成脚本 |
 | `docs/` | [构建说明](docs/build.md)、[AOT 报告](docs/aot-report.md)、[重构计划](docs/refactor-plan.md) |
 
 #### 构建、测试与数据准备

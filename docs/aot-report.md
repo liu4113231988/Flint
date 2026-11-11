@@ -54,6 +54,9 @@ apple,apple acid,apple a day...,apple-a-day,appleade,appleades,Apple AirPlay,App
 | SQLite 原生依赖 | `Microsoft.Data.Sqlite` 10.0.14（`SQLitePCLRaw` 2.1.13）；`e_sqlite3.dll` 自动复制到发布目录，**无需显式 `Batteries_V2.Init()`** 即可查询（bundle 的模块初始化在 AOT 下被保留） |
 | zstd 解码（`ZstdSharp.Port`） | 纯托管实现，NativeAOT 编译通过、无 IL 警告；CSF 查询在 AOT 下与 JIT 输出一致（见 [stardict-storage-analysis.md](stardict-storage-analysis.md#8145-aotl1)） |
 | 裁剪告警 | `Flint3.Core`/`Flint3.Data` 开启 `IsAotCompatible` 后构建无 IL 警告 |
+| 中文反查索引（2026-11-11 复测） | 纯托管 mmap + `unsafe` 指针 + 由 `GeneratedRegex` 源生成的中文词条抽取；AOT 发布 0 个 IL 警告。真实 csf + 75.92 MB 索引：`index_exact` p50 0.003 / p95 0.004 ms，`index_prefix` p50 0.008 / p95 0.413 ms，端到端 p50 2.445 / p95 3.163 ms；`match apple 10` 进程总耗时 1~3 ms（热），WorkingSet 13.1 MB |
+
+体积口径更新：本次复测 `Flint.Cli.exe` 7.31 MB + `e_sqlite3.dll` 1.98 MB = **9.29 MB**（不含 PDB），高于上方表格记录的 6.9 MB。差额来自上表之后接入的 mdx（`Flint3.Dict`）与 CSF（xxHash、Zstd），与中文反查无关——实测把中文抽取里的正则全部改成手写扫描只减少约 0.18 MB，故未保留该改动。
 
 已知告警：AOT 发布时 `Microsoft.DotNet.ILCompiler` 10.0.13（SDK 10.0.402 自带）触发 `NU1903`（GHSA-p3jp-9v83-76w9）。它是构建期编译器工具、不进入发布产物；未显式覆盖版本以避免与 runtime pack 版本错配。
 

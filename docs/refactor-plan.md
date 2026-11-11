@@ -364,10 +364,12 @@
    - 首次导入生成 sidecar 索引库 `mdx_<sha1前8位>.db`（`word`, `word_lower`, `block_index`, `record_offset`, `record_size`），按 `word_lower` 建索引；
    - `dictionarySources.json`（源生成序列化）记录来源名、路径、优先级、启用状态；
    - 词库文件复制到 `LocalFolder\FlintData\Dicts`，卸载/升级不丢。
-3. 汉英查词：
-   - 方案 A（推荐）：ECDICT 建 `stardict_zh(word_id, translation)` + FTS5 `trigram` 索引，支持中文子串匹配；
-   - 方案 B（兜底）：`translation LIKE '%词%'` + 结果上限，避免全表扫描时先按 `oxford=1/tag` 缩小集合。
-   - 中文输入时自动切换到“汉英模式”，与英文前缀查询在同一结果列表中以来源分组展示。
+3. 汉英查词（MVP 已落地）：
+   - 原方案 A（`stardict_zh` + FTS5 `trigram`）**经实测对 2 字中文查询无效**（`苹果`/`银行`/`果` 均返回 0，仅 ≥3 字可用），见 [chinese-lookup-decision.md](chinese-lookup-decision.md)；
+   - 已实现 ECDICT 旁挂有序索引 `stardict.zhx`（`Flint3.Data/Chinese`）：只做精确 + 前缀，排序为 精确 > 前缀 → Collins 降序 → frq 升序（缺失排后）→ 词长 → 字母序；不改 CSF 格式与版本位；索引缺失/损坏/版本不符/记录数不一致时中文降级、英文不受影响；
+   - 实测（3,402,564 条）：词条 2,648,701、倒排 4,642,415、构建 25.7 s、75.92 MB（7z 31.83 MB）；索引侧精确 p95 0.017 ms、前缀 p95 0.607 ms，端到端（含 CSF 回读 10 条）p50 3.65 / p95 9.10 ms；
+   - 留二期：bigram 子串（输入"果"查"苹果"）、拼音、简繁转换、分词；
+   - 方案 B 兜底（`translation LIKE`）实测单次 1.5~3.1 s，只能用于“回车后查”，不能做逐键联想。
 4. UI：**实际并入 `Views/SettingsPage` 的“mdx 词库”卡片**（列表、导入、启用/禁用、删除、进度与取消），未单独建 `DictionarySourcesPage`；导入使用 `FileOpenPicker` + `IInitializeWithWindow`（非打包）。
 5. 测试：3 个样本 mdx（小型 CC-CEDICT、一个带 HTML 的词库、一个加密词典）+ 100 词查询黄金用例；索引构建耗时与内存预算。
 
@@ -517,7 +519,7 @@ Flint3.Data（SQLite，AOT）
 1. **分发形态（已定）**：只支持 Windows，**不要 MSIX**，直接产出可双击运行的**免打包 unpackaged 自包含目录**（`WindowsPackageType=None` + `SelfContained` + `WindowsAppSDKSelfContained`，`RuntimeIdentifiers=win-x64`，无证书签名）。带来的后果与处理：`ApplicationData` 不可用 → 设置落 `%LOCALAPPDATA%\Flint3\settings.json`、数据目录落 `%LOCALAPPDATA%\Flint3\FlintData`；`StartupTask` 开机自启不可用，后续如需自启改用启动目录/注册表。
 2. **AOT 预期**：是否接受“核心库 NativeAOT + UI R2R”作为 TODO 1 的完成标准？若不接受，需要评估回退 UWP 现代 .NET 的代价（该分支已因免打包形态失效）。
 3. **mdx 支持范围**：首期是否只支持未加密、zlib、纯文本词条？`.mdd` 图片、LZO、加密词典是否进入首期？
-4. **汉英检索语义（未决）**：中文按子串匹配（`LIKE`/trigram）是否满足需求，还是需要分词/词性过滤？该决策同时决定 `stardict_zh` 的索引形态，未定前不实现汉英查词。
+4. **汉英检索语义（已定，MVP 已落地）**：采用旁挂有序索引，只做精确 + 前缀，不做子串/拼音/简繁/分词。实测依据与体积、延迟数据见 [chinese-lookup-decision.md](chinese-lookup-decision.md)；trigram 对 2 字中文查询无效。
 5. **旧工程处置**：直接删除，还是保留在 `legacy/` 分支/目录一个版本周期？
 6. **UI 框架（已定）**：**保留 WinUI 3**，不做 UI 迁移；原“P3 结束 Go/No-Go 是否转 Avalonia”的决策门已取消，仅保留 L2 技术结论。
 
