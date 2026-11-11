@@ -619,7 +619,7 @@ CREATE INDEX idx_sw ON entry(sw, word);
 
 ### 8.14.6 发布接线与回退
 
-- `tools/prepare-data.ps1`：解压后调用 `Flint.Cli build` 生成 `Flint3/Data/stardict.csf`，再跑 `verify` 对拍；`-SkipVerify` 可跳过，`-Force` 强制重建。
+- `tools/prepare-data.ps1`：从 `stardict.csf.7z.001/002` 分卷解出 `stardict.csf` 并校验 SHA256，本地有 `stardict.db` 时再跑 `verify` 对拍；`-Force` 强制重新解压，`-SkipVerify` 跳过对拍。仓库不再携带 `stardict.db` 分卷，CSF 格式变更后的 `-Rebuild` 需先从 ECDICT 上游获取源库。
 - `Flint3.csproj`：`Data/stardict.csf` 存在时作为 Content 复制到输出目录（不存在则跳过构建）。
 - 运行时（`StarDictDataAccess`）：同目录 `stardict.csf` 优先；缺失或损坏自动回退 `stardict.db`。可用 `SetBackend(Sqlite|Csf|Auto)` 或环境变量 `FLINT_STARDICT_BACKEND=sqlite|csf`、`FLINT_STARDICT_CSF=<path>` 切换。
 - 单测：新增 67 条 SQLite/CSF 逐方法对拍用例（精确/前缀/模式/生词本全量与增量/tag 计数/回退探测），全量 146 条通过。

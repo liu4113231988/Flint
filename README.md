@@ -37,7 +37,7 @@
 | --- | --- |
 | `Flint3/` | WinUI 3 应用（免打包、自包含、x64） |
 | `Flint3.Core/` | 纯逻辑：查询抽象、快捷键编码、Wordle 状态机与词表 |
-| `Flint3.Data/` | SQLite 数据访问：ECDICT 与 mdx sidecar 索引查询 |
+| `Flint3.Data/` | 词典数据访问：CSF 只读格式（缺失时回退 SQLite）与 mdx sidecar 索引查询 |
 | `Flint3.Dict/` | mdx 格式解析与索引构建 |
 | `tests/` | Core / Data / Dict 三套 xunit 用例 |
 | `tools/` | 数据准备、mdx 测试数据与 Wordle 词表生成脚本 |

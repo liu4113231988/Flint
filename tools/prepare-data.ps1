@@ -1,105 +1,110 @@
-﻿# 解压 ECDICT 词典库（stardict.7z.001/002 -> stardict.db），构建并校验 CSF 只读词典
-# 用法：powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1 [-Force] [-SkipVerify]
+﻿# 准备内置词典：从 csf 分卷解出 stardict.csf（运行时默认使用），可选从源库重建
+# 用法：powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1 [-Force] [-Rebuild] [-SkipVerify]
 param(
     [string]$DataDir = (Join-Path $PSScriptRoot "..\Flint3\Data"),
     [switch]$Force,
+    [switch]$Rebuild,
     [switch]$SkipVerify
 )
 
 $ErrorActionPreference = "Stop"
 $DataDir = (Resolve-Path $DataDir).Path
-$archive = Join-Path $DataDir "stardict.7z.001"
 $database = Join-Path $DataDir "stardict.db"
-$minSize = 500MB
+$csf = Join-Path $DataDir "stardict.csf"
+$archive = Join-Path $DataDir "stardict.csf.7z.001"
+$expectedSha256 = "E3E22A59CA185AA507478C4332A9EBB0132B6024D5053AFFE7CA9ED42FA6D335"
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$cliProject = Join-Path $repoRoot "tools\Flint.Cli\Flint.Cli.csproj"
 
-$needExtract = $true
-if ((Test-Path $database) -and -not $Force) {
-    $existingSize = (Get-Item $database).Length
-    if ($existingSize -ge $minSize) {
-        Write-Host "已存在 stardict.db（$([math]::Round($existingSize / 1MB, 1)) MB），跳过解压。需要重新解压请加 -Force。"
-        $needExtract = $false
-    }
-}
-
-if ($needExtract) {
-    if (-not (Test-Path $archive)) {
-        throw "未找到分卷压缩包：$archive"
-    }
-
-    $sevenZip = @(
+function Find-SevenZip {
+    $candidate = @(
         (Join-Path $env:ProgramFiles "7-Zip\7z.exe"),
         (Join-Path ${env:ProgramFiles(x86)} "7-Zip\7z.exe")
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-    if (-not $sevenZip) {
+    if (-not $candidate) {
         $found = Get-Command 7z -ErrorAction SilentlyContinue
-        if ($found) { $sevenZip = $found.Source }
+        if ($found) { $candidate = $found.Source }
     }
 
-    if (-not $sevenZip) {
+    if (-not $candidate) {
         throw "未找到 7-Zip，请先安装（https://www.7-zip.org/）或把 7z 加入 PATH。"
     }
 
-    Write-Host "使用 7-Zip：$sevenZip"
-    Write-Host "解压 $archive 到 $DataDir ..."
-    & $sevenZip x $archive "-o$DataDir" -y | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "7-Zip 解压失败，退出码 $LASTEXITCODE"
+    return $candidate
+}
+
+if ($Rebuild) {
+    # 重建需要上游 ECDICT 源库；仓库只分发 csf，不再携带 db 分卷
+    if (-not (Test-Path $database)) {
+        throw "重建需要源库 $database。仓库不再包含 db 分卷，请先从 ECDICT 上游获取 stardict.db 放入 Flint3/Data。"
     }
-}
 
-if (-not (Test-Path $database)) {
-    throw "未找到 $database"
-}
-
-$size = (Get-Item $database).Length
-if ($size -lt $minSize) {
-    throw "stardict.db 体积异常（$size 字节），可能未完整解压。"
-}
-Write-Host "stardict.db 就绪：$([math]::Round($size / 1MB, 1)) MB"
-
-# 构建 CSF 只读词典（运行时优先使用，缺失或损坏时自动回退 stardict.db）
-$csf = Join-Path $DataDir "stardict.csf"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$cliProject = Join-Path $repoRoot "tools\Flint.Cli\Flint.Cli.csproj"
-
-$needBuild = $true
-if ((Test-Path $csf) -and -not $Force) {
-    if ((Get-Item $csf).LastWriteTimeUtc -ge (Get-Item $database).LastWriteTimeUtc) {
-        $csfSize = [math]::Round((Get-Item $csf).Length / 1MB, 2)
-        Write-Host "已存在 stardict.csf（$csfSize MB），跳过构建。需要重建请加 -Force。"
-        $needBuild = $false
-    }
-}
-
-if ($needBuild) {
-    Write-Host "构建 stardict.csf ..."
+    Write-Host "从源库重建 stardict.csf ..."
     dotnet run --project $cliProject -c Release -- $database build $csf
     if ($LASTEXITCODE -ne 0) {
         throw "CSF 构建失败，退出码 $LASTEXITCODE"
     }
 }
+else {
+    $needExtract = $true
+    if ((Test-Path $csf) -and -not $Force) {
+        $current = (Get-FileHash $csf -Algorithm SHA256).Hash
+        if ($current -eq $expectedSha256) {
+            Write-Host "已存在 stardict.csf（$([math]::Round((Get-Item $csf).Length / 1MB, 2)) MB），跳过解压。需要重新解压请加 -Force。"
+            $needExtract = $false
+        }
+        else {
+            Write-Host "现有 stardict.csf 与分卷内容不一致，重新解压。"
+        }
+    }
+
+    if ($needExtract) {
+        if (-not (Test-Path $archive)) {
+            throw "未找到分卷压缩包：$archive"
+        }
+
+        $sevenZip = Find-SevenZip
+        Write-Host "使用 7-Zip：$sevenZip"
+        Write-Host "解压 $archive 到 $DataDir ..."
+        & $sevenZip x $archive "-o$DataDir" -y | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip 解压失败，退出码 $LASTEXITCODE"
+        }
+
+        $extracted = (Get-FileHash $csf -Algorithm SHA256).Hash
+        if ($extracted -ne $expectedSha256) {
+            throw "解压得到的 stardict.csf 校验失败：期望 $expectedSha256，实际 $extracted"
+        }
+        Write-Host "stardict.csf 校验通过（SHA256 $extracted）。"
+    }
+}
 
 if (-not $SkipVerify) {
-    Write-Host "对拍 CSF 与 SQLite（精确/前缀/模式/tag 计数）..."
-    dotnet run --project $cliProject -c Release -- $database verify $csf
-    if ($LASTEXITCODE -ne 0) {
-        throw "CSF 对拍失败，请勿发布该文件。"
-    }
-}
+    if (Test-Path $database) {
+        Write-Host "对拍 CSF 与 SQLite（精确/前缀/模式/tag 计数）..."
+        dotnet run --project $cliProject -c Release -- $database verify $csf
+        if ($LASTEXITCODE -ne 0) {
+            throw "CSF 对拍失败，请勿发布该文件。"
+        }
 
-# 校验词条数与索引（真实库校验用例默认跳过，这里显式指定路径运行）
-$env:FLINT_STARDICT_DB = $database
-Push-Location (Join-Path $PSScriptRoot "..")
-try {
-    dotnet test tests\Flint3.Data.Tests\Flint3.Data.Tests.csproj --filter "FullyQualifiedName~RealDatabaseTests" --nologo -v q
-    if ($LASTEXITCODE -ne 0) {
-        throw "词典库校验失败，请检查 stardict.db 是否完整。"
+        # 真实库校验用例默认跳过，这里显式指定路径运行
+        $env:FLINT_STARDICT_DB = $database
+        Push-Location $repoRoot
+        try {
+            dotnet test tests\Flint3.Data.Tests\Flint3.Data.Tests.csproj --filter "FullyQualifiedName~RealDatabaseTests" --nologo -v q
+            if ($LASTEXITCODE -ne 0) {
+                throw "词典库校验失败，请检查 stardict.db 是否完整。"
+            }
+        }
+        finally {
+            Remove-Item Env:\FLINT_STARDICT_DB -ErrorAction SilentlyContinue
+            Pop-Location
+        }
     }
-}
-finally {
-    Remove-Item Env:\FLINT_STARDICT_DB -ErrorAction SilentlyContinue
-    Pop-Location
+    else {
+        Write-Host "未找到 stardict.db，跳过与 SQLite 的逐条对拍（仅完成分卷解压与 SHA256 校验）。"
+    }
 }
 
 Write-Host "数据准备完成。"
