@@ -246,21 +246,23 @@
 **目标**：任何人克隆仓库后，能按文档一步构建、运行、验证。
 
 交付物：
-1. `tools/prepare-data.ps1`：解压 `Flint3/Data/stardict.7z.001/002`，校验 `stardict.db` 行数（`select count(*) from stardict`），并验证 `sw`/`word` 索引存在。
+1. `tools/prepare-data.ps1`：从 `Flint3/Data/stardict.csf.7z.001/002` 解出 `stardict.csf` 并校验固定 SHA256；本地存在 `stardict.db` 时再执行 `Flint.Cli verify` 逐条对拍与 `RealDatabaseTests`（仓库不再分发 db 分卷，CSF 格式变更后的重建需先从 ECDICT 上游获取源库）。
 2. `Flint3.csproj` / `Flint3.Interop.vcxproj` 清理（**已完成**）：关闭打包链路（`WindowsPackageType=None`、移除 `AppxPackageDir`/临时证书/MSIX 能力声明），`SelfContained` + `WindowsAppSDKSelfContained`，`RuntimeIdentifiers=win-x64`，`stardict.db` 复制到输出目录；删除未使用的 WIL `packages.config` 引用，消除 `..\..\..\packages` 硬路径导致的构建失败。
 3. 新建 `Flint3.Data.Tests`（xUnit）：先用**当前行为**写黄金用例（`MatchWord`、`GetAllExtraGlossaryWords`、exchange 解析），作为后续重构的护栏。
 4. `docs/build.md`：前置条件（SDK、VS C++/CLI、7z）、构建/发布命令。
-5. 处理 D1：数据库初始化改为可等待的 `Task`（`InitializeAsync` + `TaskCompletionSource` 或 `Lazy<Task>`），查询前统一 `await`。
+5. 处理 D1（**已按不同方案落地**）：未引入可等待的 `InitializeAsync`；`StarDictDataAccess` 改为首次查询时同步惰性创建后端（CSF 走 mmap，打开成本低），`InitializeDatabase` 仅保留给测试指定库路径，`MainViewModel` 不再调用它。
 
 风险：
 - 分卷 7z 解压路径/文件句柄问题；`stardict.db` 约数百 MB，测试中应使用裁剪后的 fixture 库而不是全库。
-- 免打包形态没有包标识：`ApplicationData`/`StartupTask`/`FileOpenPicker` 等 API 不可用，必须走本地路径回退（已实现设置与数据目录回退，开机自启功能暂缺）。
+- 免打包形态没有包标识：`ApplicationData`/`StartupTask`/`FileOpenPicker` 等 API 不可用，必须走本地路径回退（设置与数据目录回退、HKCU 开机自启均已实现）。
 
 验收：
 - 干净目录 + 脚本 + `msbuild Flint.sln /p:Configuration=Release /p:Platform=x64` 成功；
 - 应用启动后输入 `hello` 命中；
 - `dotnet test` 全绿，且测试不依赖真实 `stardict.db`；
 - 冷启动脚本连续 20 次“启动即输入”不再出现空结果。
+
+**验收状态（2026-11-11）**：构建、`hello` 命中与测试全绿已满足；20 次冷启动未做实测记录。
 
 ---
 
@@ -289,6 +291,8 @@
 - 默认 Alt+Space、自定义快捷键（含 Win 组合）、简洁/完整两种窗口模式均正确唤起；
 - 连续触发 200 次无失效、无句柄泄漏（退出后钩子已卸载）；
 - 快捷键设置 JSON 仍可读写（格式不变）。
+
+**验收状态（2026-11-11）**：去 C++/CLI、默认/自定义快捷键、JSON 读写已满足；200 次唤起与句柄泄漏未做自动化或实测记录。
 
 ---
 
@@ -364,7 +368,7 @@
    - 方案 A（推荐）：ECDICT 建 `stardict_zh(word_id, translation)` + FTS5 `trigram` 索引，支持中文子串匹配；
    - 方案 B（兜底）：`translation LIKE '%词%'` + 结果上限，避免全表扫描时先按 `oxford=1/tag` 缩小集合。
    - 中文输入时自动切换到“汉英模式”，与英文前缀查询在同一结果列表中以来源分组展示。
-4. UI：`Views/DictionarySourcesPage`（词库列表、导入、启用/禁用、优先级、删除）+ 设置页入口；导入使用 `FileOpenPicker`（打包）/`IInitializeWithWindow`（非打包，按 P3 结论决定是否支持）。
+4. UI：**实际并入 `Views/SettingsPage` 的“mdx 词库”卡片**（列表、导入、启用/禁用、删除、进度与取消），未单独建 `DictionarySourcesPage`；导入使用 `FileOpenPicker` + `IInitializeWithWindow`（非打包）。
 5. 测试：3 个样本 mdx（小型 CC-CEDICT、一个带 HTML 的词库、一个加密词典）+ 100 词查询黄金用例；索引构建耗时与内存预算。
 
 风险：
@@ -380,6 +384,8 @@
 - 20 个中文词（如“苹果”“计算机”“银行”）能返回合理英文词条；
 - 导入 500MB 词典时 UI 不卡死，可取消，内存峰值有记录；
 - 删除词典后索引文件被清理，不影响 ECDICT。
+
+**验收状态（2026-11-11）**：导入、启停、删除、重启后可用与索引清理已满足；**汉英查词未实现**（无中文索引，且 §10.4 语义待决策）；**100 词黄金用例未完成**（现有样本仅 3 条词目，仓库无 mdx 生成器）；500MB 导入已具备进度、取消与后台索引构建，但未做 500MB 实测与内存峰值记录。
 
 ---
 
@@ -445,8 +451,7 @@
 
 ```
 Flint3（UI）
-  ├─ Views/DictionarySourcesPage      ← 词库管理（导入/启停/优先级）
-  ├─ ViewModels/DictionarySourcesViewModel
+  ├─ Views/SettingsPage.xaml(.cs)     ← 词库管理（导入/启停/删除/取消）实际位置
   └─ ViewModels/MainViewModel_Flint   ← 只调用 WordQueryService，不写 SQL
 
 Flint3.Core（纯逻辑，AOT）
@@ -476,7 +481,7 @@ Flint3.Data（SQLite，AOT）
 - 逻辑：`Flint3.Core/Wordle/`（无 UI、无 IO，构造参数为答案与词表接口）。
 - 模式匹配：并入 `WordQueryService.PatternAsync`，与 wordle 共用“按长度/字母集筛选”的底层能力，避免两套实现。
 - UI：`Flint3/Views/WordlePage.xaml(.cs)` + `Flint3/ViewModels/WordleViewModel.cs`；入口放 `FlintFullPage` 标题栏或设置页（与生词本入口同级），不要塞进搜索框。
-- 词表：随 `stardict.db` 构建阶段生成 `wordle_words` 表；运行时只读，保证启动不扫描全库。
+- 词表：由 `tools/wordle/gen_wordle_words.py` 从 ECDICT 生成 `Flint3.Core/Wordle/wordle_words.json`，作为嵌入资源随程序发布；运行时只读，不扫描词库。
 - 键盘：复用 `Controls/KeyVisual`，状态色复用现有主题资源，避免新配色体系。
 
 ## 8. 建议动手顺序与理由
@@ -501,7 +506,7 @@ Flint3.Data（SQLite，AOT）
 | P1 | 无 C++/CLI，快捷键行为不变 | 200 次唤起无失效；无需 C++ 工作负载即可构建；钩子可卸载 |
 | P2 | 查询逻辑可单测、无乱序 | 50 条语料与基线一致；快速输入无旧结果覆盖；VM 无 SQL |
 | P3 | 核心库真 AOT，UI AOT 友好 | `PublishAot` 成功；0 个 IL2xxx/IL3xxx；L2 有结论 |
-| P4 | 可导入 mdx、可汉英互查 | 3 个样本词典；100 词黄金用例；500MB 导入可取消不卡 UI |
+| P4 | 可导入 mdx、可汉英互查 | 3 个样本词典；100 词黄金用例；500MB 导入可取消不卡 UI（**汉英互查、100 词用例未完成，见 P4 验收状态**） |
 | P5 | 模式匹配 + 可玩 wordle | 模式查询 <200ms；判定用例全绿；状态可恢复 |
 | P6 | 仓库干净、文档一致 | 无未引用工程；README/命令可复现 |
 
@@ -512,13 +517,15 @@ Flint3.Data（SQLite，AOT）
 1. **分发形态（已定）**：只支持 Windows，**不要 MSIX**，直接产出可双击运行的**免打包 unpackaged 自包含目录**（`WindowsPackageType=None` + `SelfContained` + `WindowsAppSDKSelfContained`，`RuntimeIdentifiers=win-x64`，无证书签名）。带来的后果与处理：`ApplicationData` 不可用 → 设置落 `%LOCALAPPDATA%\Flint3\settings.json`、数据目录落 `%LOCALAPPDATA%\Flint3\FlintData`；`StartupTask` 开机自启不可用，后续如需自启改用启动目录/注册表。
 2. **AOT 预期**：是否接受“核心库 NativeAOT + UI R2R”作为 TODO 1 的完成标准？若不接受，需要评估回退 UWP 现代 .NET 的代价（该分支已因免打包形态失效）。
 3. **mdx 支持范围**：首期是否只支持未加密、zlib、纯文本词条？`.mdd` 图片、LZO、加密词典是否进入首期？
-4. **汉英检索语义**：中文按子串匹配（`LIKE`/trigram）是否满足需求，还是需要分词/词性过滤？
+4. **汉英检索语义（未决）**：中文按子串匹配（`LIKE`/trigram）是否满足需求，还是需要分词/词性过滤？该决策同时决定 `stardict_zh` 的索引形态，未定前不实现汉英查词。
 5. **旧工程处置**：直接删除，还是保留在 `legacy/` 分支/目录一个版本周期？
 6. **UI 框架（已定）**：**保留 WinUI 3**，不做 UI 迁移；原“P3 结束 Go/No-Go 是否转 Avalonia”的决策门已取消，仅保留 L2 技术结论。
 
 ---
 
 ## 附录：证据索引
+
+> 下表行号与项目路径基于重构前的快照，仅作历史定位；`Flint3.Interop`、`Flint/` 等工程已删除或移入 `legacy/`，现行结构以 `Flint.sln` 为准。
 
 | 结论 | 代码位置 |
 | --- | --- |
