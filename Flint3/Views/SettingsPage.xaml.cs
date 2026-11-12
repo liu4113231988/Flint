@@ -313,23 +313,6 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// 打分评价
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private async void OnClickGoToStoreRate(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                await Launcher.LaunchUriAsync(new Uri($"ms-windows-store:REVIEW?PFN={Package.Current.Id.FamilyName}"));
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex.Message);
-            }
-        }
-
-        /// <summary>
         /// 打开生词本文件目录
         /// </summary>
         /// <param name="sender"></param>
@@ -450,7 +433,7 @@ namespace Flint3.Views
         {
             try
             {
-                await Windows.System.Launcher.LaunchUriAsync(new Uri("https://github.com/sh0ckj0ckey/Flint"));
+                await Windows.System.Launcher.LaunchUriAsync(new Uri("https://github.com/liu4113231988/Flint"));
             }
             catch (Exception ex)
             {

@@ -486,12 +486,6 @@
                     <labs:SettingsExpander.Description>
                         <TextBlock Text="燧石是一款开源的离线英汉词典"/>
                     </labs:SettingsExpander.Description>
-                    <Button Height="34" Click="OnClickGoToStoreRate" ToolTipService.ToolTip="去应用商店打分评价">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <FontIcon FontFamily="Segoe UI Emoji" Glyph="&#x1FAA8;" FontSize="14" VerticalAlignment="Center"/>
-                            <TextBlock Text="打分评价" VerticalAlignment="Center" FontSize="13"/>
-                        </StackPanel>
-                    </Button>
                     <labs:SettingsExpander.Items>
 
                         <!--开源地址-->
@@ -519,70 +513,6 @@
                                     <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8A7;" FontSize="14"/>
                                 </StackPanel>
                             </HyperlinkButton>
-                        </labs:SettingsCard>
-
-                        <!--反馈-->
-                        <labs:SettingsCard HorizontalAlignment="Stretch">
-                            <labs:SettingsCard.Description>
-                                <TextBlock Text="如果您遇到问题或有任何建议"/>
-                            </labs:SettingsCard.Description>
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8">
-                                <Button Height="34" Background="Transparent">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Image Width="20" Height="20" Margin="0,0,0,0">
-                                            <Image.Source>
-                                                <BitmapImage UriSource="ms-appx:///Assets/icon_mail.png" DecodePixelHeight="40" DecodePixelType="Logical"/>
-                                            </Image.Source>
-                                        </Image>
-                                        <TextBlock Text="发送邮件" VerticalAlignment="Center" FontSize="13" Margin="8,0,2,0"/>
-                                    </StackPanel>
-                                    <Button.Flyout>
-                                        <Flyout>
-                                            <HyperlinkButton Content="yaoyiming123@live.com" ToolTipService.ToolTip="点击向我发送邮件" NavigateUri="mailto:yaoyiming123@live.com"/>
-                                        </Flyout>
-                                    </Button.Flyout>
-                                </Button>
-                                <Button Height="34" Background="Transparent">
-                                    <Image Width="20" Height="20" Margin="0,0,0,0">
-                                        <Image.Source>
-                                            <BitmapImage UriSource="ms-appx:///Assets/icon_qq.png" DecodePixelHeight="40" DecodePixelType="Logical"/>
-                                        </Image.Source>
-                                    </Image>
-                                    <Button.Flyout>
-                                        <Flyout Placement="Left">
-                                            <Border Width="218" Height="300" CornerRadius="4">
-                                                <Border.Background>
-                                                    <ImageBrush Stretch="UniformToFill">
-                                                        <ImageBrush.ImageSource>
-                                                            <BitmapImage UriSource="ms-appx:///Assets/img_feedback_qq.jpg" DecodePixelHeight="600" DecodePixelType="Logical"/>
-                                                        </ImageBrush.ImageSource>
-                                                    </ImageBrush>
-                                                </Border.Background>
-                                            </Border>
-                                        </Flyout>
-                                    </Button.Flyout>
-                                </Button>
-                                <Button Height="34" Background="Transparent">
-                                    <Image Width="20" Height="20" Margin="0,0,0,0">
-                                        <Image.Source>
-                                            <BitmapImage UriSource="ms-appx:///Assets/icon_wechat.png" DecodePixelHeight="40" DecodePixelType="Logical"/>
-                                        </Image.Source>
-                                    </Image>
-                                    <Button.Flyout>
-                                        <Flyout Placement="Left">
-                                            <Border Width="225" Height="300" CornerRadius="4">
-                                                <Border.Background>
-                                                    <ImageBrush Stretch="UniformToFill">
-                                                        <ImageBrush.ImageSource>
-                                                            <BitmapImage UriSource="ms-appx:///Assets/img_feedback_wechat.jpg" DecodePixelHeight="600" DecodePixelType="Logical"/>
-                                                        </ImageBrush.ImageSource>
-                                                    </ImageBrush>
-                                                </Border.Background>
-                                            </Border>
-                                        </Flyout>
-                                    </Button.Flyout>
-                                </Button>
-                            </StackPanel>
                         </labs:SettingsCard>
                     </labs:SettingsExpander.Items>
                 </labs:SettingsExpander>
