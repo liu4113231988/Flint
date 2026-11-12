@@ -192,6 +192,31 @@ namespace Flint3.Views
         }
 
         /// <summary>
+        /// 底部独立 AI 翻译面板：开合切换，打开时聚焦输入框
+        /// </summary>
+        private void OnClickToggleAiTranslationPanel(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.IsAiTranslationMode)
+            {
+                ViewModel.ExitAiTranslationMode();
+                return;
+            }
+
+            ViewModel.EnterAiTranslationMode();
+            AiPanelInputBox?.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+        }
+
+        private void OnClickCloseAiPanel(object sender, RoutedEventArgs e)
+        {
+            ViewModel.ExitAiTranslationMode();
+        }
+
+        private void OnClickAiPanelTranslate(object sender, RoutedEventArgs e)
+        {
+            ViewModel.TranslatePanel(AiPanelInputBox?.Text);
+        }
+
+        /// <summary>
         /// AI 翻译搜索框中的整句（不进入词条结果列表）
         /// </summary>
         private void OnClickTranslateSentence(object sender, RoutedEventArgs e)

@@ -54,6 +54,97 @@ namespace Flint3.ViewModels
             private set => SetProperty(ref _canTranslateSentence, value);
         }
 
+        private bool _isAiTranslationMode;
+
+        /// <summary>
+        /// 底部独立 AI 翻译面板是否打开（替代结果区显示）
+        /// </summary>
+        public bool IsAiTranslationMode
+        {
+            get => _isAiTranslationMode;
+            private set
+            {
+                if (SetProperty(ref _isAiTranslationMode, value))
+                {
+                    OnPropertyChanged(nameof(IsResultsAreaVisible));
+                }
+            }
+        }
+
+        /// <summary>x:Bind 需要的稳定布尔：AI 面板模式下隐藏查词结果区</summary>
+        public bool IsResultsAreaVisible => !IsAiTranslationMode;
+
+        private AiTranslationItem? _panelTranslation;
+
+        /// <summary>独立面板的翻译状态；与整句卡各自独立</summary>
+        public AiTranslationItem? PanelTranslation
+        {
+            get => _panelTranslation;
+            private set
+            {
+                if (SetProperty(ref _panelTranslation, value))
+                {
+                    OnPropertyChanged(nameof(PanelResultVisible));
+                }
+            }
+        }
+
+        /// <summary>独立面板结果卡是否可见</summary>
+        public bool PanelResultVisible => PanelTranslation is not null;
+
+        public void EnterAiTranslationMode()
+        {
+            IsAiTranslationMode = true;
+        }
+
+        public void ExitAiTranslationMode()
+        {
+            IsAiTranslationMode = false;
+        }
+
+        /// <summary>
+        /// 独立面板翻译：整段文本，自动识别方向
+        /// </summary>
+        public async void TranslatePanel(string rawText)
+        {
+            string text = rawText?.Trim() ?? "";
+            if (text.Length == 0 || IsPatternInput(text))
+            {
+                return;
+            }
+
+            if (BuildAiOptions(out string? configError) is not LlmTranslationOptions options)
+            {
+                AiTranslationItem failState = new();
+                PanelTranslation = failState;
+                ShowTranslationFailure(failState, LlmFailureKind.NotConfigured, configError ?? "未配置", retryable: false);
+                return;
+            }
+
+            SearchRequest request = _translationCoordinator.BeginRequest();
+            AiTranslationItem panelState = new();
+            PanelTranslation = panelState;
+            ShowTranslationRunning(panelState);
+
+            LlmTranslationOutcome outcome;
+            try
+            {
+                outcome = await _translationService.TranslateAsync(options, text, TranslationDirection.Auto, request.Token);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
+                return;
+            }
+
+            if (!_translationCoordinator.IsCurrent(request.Sequence))
+            {
+                return;
+            }
+
+            this.Dispatcher.TryEnqueue(() => ApplyTranslationOutcome(panelState, outcome, options.Model));
+        }
+
         /// <summary>
         /// 每次搜索输入变化时同步整句翻译入口；新输入作废上一次整句翻译
         /// </summary>
