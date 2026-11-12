@@ -172,12 +172,19 @@ namespace Flint3.ViewModels
             }
             catch (Exception ex)
             {
+                // client 已归一化常见错误；此处兜底，避免状态卡在"加载中"
                 System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
+                this.Dispatcher.TryEnqueue(() => ShowTranslationFailure(panelState, LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true));
                 return;
             }
 
             if (!_translationCoordinator.IsCurrent(request.Sequence))
             {
+                this.Dispatcher.TryEnqueue(() =>
+                {
+                    panelState.Phase = AiTranslationPhase.Idle;
+                    panelState.IsVisible = false;
+                });
                 return;
             }
 
@@ -334,13 +341,20 @@ namespace Flint3.ViewModels
             }
             catch (Exception ex)
             {
+                // client 已归一化常见错误；此处兜底，避免状态卡在"加载中"
                 System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
+                this.Dispatcher.TryEnqueue(() => ShowTranslationFailure(state, LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true));
                 return;
             }
 
             if (!_translationCoordinator.IsCurrent(request.Sequence))
             {
-                // 已被新请求顶掉，丢弃
+                // 已被新请求顶掉，静默收起
+                this.Dispatcher.TryEnqueue(() =>
+                {
+                    state.Phase = AiTranslationPhase.Idle;
+                    state.IsVisible = false;
+                });
                 return;
             }
 
@@ -380,12 +394,19 @@ namespace Flint3.ViewModels
             }
             catch (Exception ex)
             {
+                // client 已归一化常见错误；此处兜底，避免状态卡在"加载中"
                 System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
+                this.Dispatcher.TryEnqueue(() => ShowTranslationFailure(sentenceState, LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true));
                 return;
             }
 
             if (!_translationCoordinator.IsCurrent(request.Sequence))
             {
+                this.Dispatcher.TryEnqueue(() =>
+                {
+                    sentenceState.Phase = AiTranslationPhase.Idle;
+                    sentenceState.IsVisible = false;
+                });
                 return;
             }
 
@@ -425,7 +446,7 @@ namespace Flint3.ViewModels
                 state.IsVisible = true;
                 state.ResultText = "";
                 state.ErrorText = "";
-                state.DetailText = "";
+                state.DetailText = "正在请求翻译接口...";
                 state.CanRetry = false;
             }
 
@@ -464,6 +485,8 @@ namespace Flint3.ViewModels
         /// </summary>
         private void ApplyTranslationOutcome(AiTranslationItem state, LlmTranslationOutcome outcome, string model)
         {
+            System.Diagnostics.Trace.WriteLine($"AI translate outcome: success={outcome.Success}, kind={outcome.FailureKind}");
+
             if (outcome.Success)
             {
                 state.Phase = AiTranslationPhase.Done;
