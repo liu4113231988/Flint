@@ -23,7 +23,7 @@
         <SelfContained>true</SelfContained>
         <WindowsPackageType>None</WindowsPackageType>
         <!-- 卫星程序集只保留中英；WinUI 的 .mui 语言目录由下面的目标单独过滤 -->
-        <SatelliteResourceLanguages>en;en-US;en-GB;zh;zh-Hans;zh-Hant;zh-CN;zh-TW</SatelliteResourceLanguages>
+        <SatelliteResourceLanguages>en;en-US;zh;zh-CN</SatelliteResourceLanguages>
     </PropertyGroup>
     <ItemGroup>
         <None Remove="Assets\flint_logo_background_dark.png" />
