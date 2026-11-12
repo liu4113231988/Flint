@@ -161,14 +161,34 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// AI 翻译当前词条（手动触发）
+        /// AI 翻译当前词条（手动触发）；折叠状态下先展开，否则结果块不可见
         /// </summary>
         private void OnClickTranslateWord(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.DataContext is StarDictWordItem item)
             {
+                if (FindAncestor<Microsoft.UI.Xaml.Controls.Expander>(btn) is Microsoft.UI.Xaml.Controls.Expander expander)
+                {
+                    expander.IsExpanded = true;
+                }
+
                 MainViewModel.Instance.TranslateWord(item);
             }
+        }
+
+        private static T? FindAncestor<T>(Microsoft.UI.Xaml.DependencyObject? node) where T : Microsoft.UI.Xaml.DependencyObject
+        {
+            while (node is not null)
+            {
+                if (node is T match)
+                {
+                    return match;
+                }
+
+                node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node);
+            }
+
+            return null;
         }
 
         /// <summary>
