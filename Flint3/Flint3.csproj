@@ -13,7 +13,7 @@
         <UseWinUI>true</UseWinUI>
         <DefaultLanguage>zh-CN</DefaultLanguage>
         <!-- 免打包时界面版本号回退到程序集版本，与 Package.appxmanifest 的 Identity 保持一致 -->
-        <Version>3.4.3</Version>
+        <Version>3.5.0</Version>
         <CsWinRTAotOptimizerEnabled>true</CsWinRTAotOptimizerEnabled>
         <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
         <SupportedOSPlatformVersion>10.0.22000.0</SupportedOSPlatformVersion>
