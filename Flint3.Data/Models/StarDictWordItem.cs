@@ -47,6 +47,11 @@ namespace Flint3.Data.Models
         /// </summary>
         public string Source { get; set; } = "";
 
+        /// <summary>
+        /// AI 翻译状态；在 MakeupWordItem 阶段就创建好（保证 x:Bind 路径非空），初始不可见
+        /// </summary>
+        public AiTranslationItem AiTranslation { get; set; } = new();
+
         private string _description = "";
 
         /// <summary>
