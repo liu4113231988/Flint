@@ -20,6 +20,11 @@ namespace Flint3.Helpers
         private const string SETTING_NAME_AUTOCLEARLASTINPUT = "AutoClearLastInput";
         private const string SETTING_NAME_CLOSEBUTTONMODE = "CloseButtonMode";
         private const string SETTING_NAME_SEARCHBOXSTYLE = "SearchBoxStyle";
+        private const string SETTING_NAME_ENABLEAITRANSLATION = "EnableAiTranslation";
+        private const string SETTING_NAME_AIBASEURL = "AiBaseUrl";
+        private const string SETTING_NAME_AIMODEL = "AiModel";
+        private const string SETTING_NAME_AIAPIKEYPROTECTED = "AiApiKeyProtected";
+        private const string SETTING_NAME_AIEXTRAHEADERS = "AiExtraHeaders";
 
         private readonly ISettingsStore _store;
 
@@ -63,6 +68,16 @@ namespace Flint3.Helpers
         private int _closeButtonMode = -1;
 
         private int _searchBoxStyle = -1;
+
+        private bool? _enableAiTranslation = null;
+
+        private string? _aiBaseUrl = null;
+
+        private string? _aiModel = null;
+
+        private string? _aiApiKeyProtected = null;
+
+        private string? _aiExtraHeaders = null;
 
         public event EventHandler<int>? AppearanceSettingChanged = null;
 
@@ -543,6 +558,114 @@ namespace Flint3.Helpers
             {
                 SetProperty(ref _searchBoxStyle, value);
                 _store[SETTING_NAME_SEARCHBOXSTYLE] = _searchBoxStyle;
+            }
+        }
+
+        /// <summary>
+        /// 是否启用 AI 翻译（默认关闭；涉及把查询文本发送到用户配置的第三方接口）
+        /// </summary>
+        public bool EnableAiTranslation
+        {
+            get
+            {
+                try
+                {
+                    if (_enableAiTranslation is null)
+                    {
+                        _enableAiTranslation = _store[SETTING_NAME_ENABLEAITRANSLATION]?.ToString() == "True";
+                    }
+                }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+                return _enableAiTranslation == true;
+            }
+            set
+            {
+                SetProperty(ref _enableAiTranslation, value);
+                _store[SETTING_NAME_ENABLEAITRANSLATION] = _enableAiTranslation;
+            }
+        }
+
+        /// <summary>
+        /// AI 接口地址（OpenAI 兼容 baseUrl，通常已含 /v1）
+        /// </summary>
+        public string AiBaseUrl
+        {
+            get
+            {
+                try
+                {
+                    _aiBaseUrl ??= _store[SETTING_NAME_AIBASEURL]?.ToString() ?? "";
+                }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+                return _aiBaseUrl ?? "";
+            }
+            set
+            {
+                SetProperty(ref _aiBaseUrl, value);
+                _store[SETTING_NAME_AIBASEURL] = _aiBaseUrl;
+            }
+        }
+
+        /// <summary>
+        /// AI 模型名
+        /// </summary>
+        public string AiModel
+        {
+            get
+            {
+                try
+                {
+                    _aiModel ??= _store[SETTING_NAME_AIMODEL]?.ToString() ?? "";
+                }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+                return _aiModel ?? "";
+            }
+            set
+            {
+                SetProperty(ref _aiModel, value);
+                _store[SETTING_NAME_AIMODEL] = _aiModel;
+            }
+        }
+
+        /// <summary>
+        /// DPAPI 加密后的 API Key（Base64），设置页之外不还原明文
+        /// </summary>
+        public string AiApiKeyProtected
+        {
+            get
+            {
+                try
+                {
+                    _aiApiKeyProtected ??= _store[SETTING_NAME_AIAPIKEYPROTECTED]?.ToString() ?? "";
+                }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+                return _aiApiKeyProtected ?? "";
+            }
+            set
+            {
+                SetProperty(ref _aiApiKeyProtected, value);
+                _store[SETTING_NAME_AIAPIKEYPROTECTED] = _aiApiKeyProtected;
+            }
+        }
+
+        /// <summary>
+        /// 自定义 HTTP Header，每行一条 name: value（不写日志）
+        /// </summary>
+        public string AiExtraHeaders
+        {
+            get
+            {
+                try
+                {
+                    _aiExtraHeaders ??= _store[SETTING_NAME_AIEXTRAHEADERS]?.ToString() ?? "";
+                }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+                return _aiExtraHeaders ?? "";
+            }
+            set
+            {
+                SetProperty(ref _aiExtraHeaders, value);
+                _store[SETTING_NAME_AIEXTRAHEADERS] = _aiExtraHeaders;
             }
         }
     }

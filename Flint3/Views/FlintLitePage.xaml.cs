@@ -44,7 +44,7 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// ÎÄ±¾¿òÓĞÄÚÈİÊ±´°¿Ú±ä´ó£¬ÎŞÄÚÈİÊ±Ö»ÏÔÊ¾ËÑË÷¿ò
+        /// æ–‡æœ¬æ¡†æœ‰å†…å®¹æ—¶çª—å£å˜å¤§ï¼Œæ— å†…å®¹æ—¶åªæ˜¾ç¤ºæœç´¢æ¡†
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -55,7 +55,7 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// µã»÷ÏÔÊ¾Ö÷´°¿Ú
+        /// ç‚¹å‡»æ˜¾ç¤ºä¸»çª—å£
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -65,10 +65,22 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// Ìí¼Óµ¥´Êµ½Éú´Ê±¾
+        /// æ·»åŠ å•è¯åˆ°ç”Ÿè¯æœ¬
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
+        /// <summary>
+        /// åœ¨ä¸»çª—ä¸­ AI ç¿»è¯‘è¯¥è¯æ¡ï¼šæ‰“å¼€ä¸»çª—ã€å›å¡«æœç´¢æ¡†å¹¶ç›´æ¥å‘èµ·ç¿»è¯‘
+        /// </summary>
+        private void OnClickTranslateInMainWindow(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is StarDictWordItem item && !string.IsNullOrWhiteSpace(item.Word))
+            {
+                App.ShowMainWindow();
+                App.FlintMainWindow?.TryTranslateText(item.Word);
+            }
+        }
+
         private void OnClickAddWordToGlossary(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.DataContext is StarDictWordItem item)
@@ -83,7 +95,7 @@ namespace Flint3.Views
         }
 
         /// <summary>
-        /// ÀÊ¶Áµ¥´Ê
+        /// æœ—è¯»å•è¯
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>

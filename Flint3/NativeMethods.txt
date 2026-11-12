@@ -8,3 +8,6 @@ GetForegroundWindow
 GetCursorPos
 MonitorFromPoint
 GetDpiForMonitor
+CryptProtectData
+CryptUnprotectData
+CRYPTPROTECT_UI_FORBIDDEN

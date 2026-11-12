@@ -89,6 +89,7 @@ namespace Flint3.ViewModels
             ObservableCollection<StarDictWordItem> wordsCollection = searchingFromMain ? this.SearchResultWordItems : this.LiteSearchResultWordItems;
             SearchRequest request = _searchCoordinator.BeginRequest();
             SearchHint = string.Empty;
+            UpdateSentenceState(word);
 
             if (string.IsNullOrWhiteSpace(word))
             {

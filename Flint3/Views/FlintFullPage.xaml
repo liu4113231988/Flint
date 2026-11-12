@@ -44,8 +44,44 @@
                        Visibility="{x:Bind SearchTextBox.Text.Length,Mode=OneWay,Converter={StaticResource Int2Vis},ConverterParameter=-}"/>
         </Grid>
 
-        <!--占位图片-->
-        <Grid Grid.Row="2" Visibility="{x:Bind ViewModel.SearchResultWordItems.Count,Mode=OneWay,Converter={StaticResource Int2Vis},ConverterParameter=-}" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <!--结果区：整句翻译 + 占位图 + 结果列表-->
+        <Grid Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!--整句翻译入口：输入含空白或 CJK≥8 字时出现-->
+            <StackPanel Grid.Row="0" Margin="16,8,16,0" Spacing="4"
+                        Visibility="{x:Bind ViewModel.CanTranslateSentence,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
+                <Button Content="翻译整句" Height="32" Padding="12,0" HorizontalAlignment="Left" Click="OnClickTranslateSentence"
+                        ToolTipService.ToolTip="将输入内容发送到 AI 翻译"/>
+            </StackPanel>
+
+            <!--整句翻译结果卡-->
+            <StackPanel Grid.Row="0" Margin="16,8,16,4" Spacing="4"
+                        Visibility="{x:Bind ViewModel.SentenceResultVisible,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="AI 翻译" FontSize="12" FontWeight="SemiBold" Opacity="0.6"/>
+                    <muxc:ProgressRing Grid.Column="1" Width="16" Height="16"
+                                       Visibility="{x:Bind ViewModel.SentenceTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                </Grid>
+                <TextBlock Text="{x:Bind ViewModel.SentenceTranslation.ResultText,Mode=OneWay}" Opacity="0.8" TextWrapping="Wrap" LineHeight="24" IsTextSelectionEnabled="True"
+                           Visibility="{x:Bind ViewModel.SentenceTranslation.ResultText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                <TextBlock Text="{x:Bind ViewModel.SentenceTranslation.ErrorText,Mode=OneWay}" Opacity="0.7" FontSize="13" TextWrapping="Wrap"
+                           Visibility="{x:Bind ViewModel.SentenceTranslation.ErrorText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                <TextBlock Text="{x:Bind ViewModel.SentenceTranslation.DetailText,Mode=OneWay}" Opacity="0.45" FontSize="11"
+                           Visibility="{x:Bind ViewModel.SentenceTranslation.DetailText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                <Button Content="重试" Height="28" Padding="12,0" HorizontalAlignment="Left" Click="OnClickTranslateSentence"
+                        Visibility="{x:Bind ViewModel.SentenceTranslation.CanRetry,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+            </StackPanel>
+
+            <!--占位图片-->
+            <Grid Grid.Row="1" Visibility="{x:Bind ViewModel.SearchResultWordItems.Count,Mode=OneWay,Converter={StaticResource Int2Vis},ConverterParameter=-}" HorizontalAlignment="Center" VerticalAlignment="Center">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
                 <Image Source="/Assets/Logos/flint_logo.png" Height="72" Width="72" Opacity="0.2" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <animations:Implicit.ShowAnimations>
@@ -62,7 +98,7 @@
         </Grid>
 
         <!--搜索结果列表-->
-        <Grid Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+        <Grid Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
             <ListView ItemsSource="{x:Bind ViewModel.SearchResultWordItems,Mode=OneWay}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" Padding="0,8,2,8" HorizontalAlignment="Stretch" SelectionMode="None" IsItemClickEnabled="False" IsSwipeEnabled="False">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="mdl:StarDictWordItem">
@@ -71,6 +107,7 @@
                                 <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
@@ -105,6 +142,14 @@
                                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE109;" FontSize="12" Opacity="0.8"/>
                                         </Button.Content>
                                     </Button>
+                                    <!--AI 翻译按钮：手动触发，不自动请求-->
+                                    <Button Grid.Column="3" Padding="0" Height="32" Width="32" Margin="16,0,-8,0" Background="Transparent" BorderBrush="Transparent" ToolTipService.ToolTip="AI 翻译"
+                                            Visibility="{Binding ViewModel.AppSettings.EnableAiTranslation,ElementName=FlintFullViewPage,Mode=OneWay,Converter={StaticResource Bool2Vis}}"
+                                            Click="OnClickTranslateWord">
+                                        <Button.Content>
+                                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE774;" FontSize="12" Opacity="0.8"/>
+                                        </Button.Content>
+                                    </Button>
                                 </Grid>
                             </muxc:Expander.Header>
                             <muxc:Expander.Content>
@@ -134,12 +179,34 @@
                                             </DataTemplate>
                                         </muxc:ItemsRepeater>
                                     </Grid>
+                                    <!--AI 翻译区块：独立于本地释义，手动触发后显示-->
+                                    <StackPanel Orientation="Vertical" Spacing="6" Margin="0,12,0,0"
+                                                Visibility="{x:Bind AiTranslation.IsVisible,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="AI 翻译" FontSize="12" FontWeight="SemiBold" Opacity="0.6"/>
+                                            <muxc:ProgressRing Grid.Column="1" Width="16" Height="16"
+                                                               Visibility="{x:Bind AiTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                                        </Grid>
+                                        <TextBlock Text="{x:Bind AiTranslation.ResultText,Mode=OneWay}" Opacity="0.8" TextWrapping="Wrap" LineHeight="24" IsTextSelectionEnabled="True"
+                                                   Visibility="{x:Bind AiTranslation.ResultText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                                        <TextBlock Text="{x:Bind AiTranslation.ErrorText,Mode=OneWay}" Opacity="0.7" FontSize="13" TextWrapping="Wrap"
+                                                   Visibility="{x:Bind AiTranslation.ErrorText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                                        <TextBlock Text="{x:Bind AiTranslation.DetailText,Mode=OneWay}" Opacity="0.45" FontSize="11"
+                                                   Visibility="{x:Bind AiTranslation.DetailText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                                        <Button Content="重试" Height="28" Padding="12,0" HorizontalAlignment="Left" Click="OnClickTranslateWord"
+                                                Visibility="{x:Bind AiTranslation.CanRetry,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </muxc:Expander.Content>
                         </muxc:Expander>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+        </Grid>
         </Grid>
 
         <!--工具栏-->

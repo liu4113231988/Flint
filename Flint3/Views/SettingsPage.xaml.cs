@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
+using Flint3.Core.Translation;
 using Flint3.Data.Mdx;
 using Flint3.Dict;
 using Flint3.Helpers;
@@ -45,7 +46,108 @@ namespace Flint3.Views
         {
             DictionaryListView.ItemsSource = _dictionaries;
             LoadDictionaries();
+            LoadAiSettings();
         }
+
+        #region AI 翻译
+
+        /// <summary>
+        /// 回填 AI 翻译配置；API Key 只回填密文占位，永不显示明文
+        /// </summary>
+        private void LoadAiSettings()
+        {
+            AiBaseUrlBox.Text = _viewModel.AppSettings.AiBaseUrl;
+            AiModelBox.Text = _viewModel.AppSettings.AiModel;
+            AiHeadersBox.Text = _viewModel.AppSettings.AiExtraHeaders;
+            AiApiKeyBox.Password = _viewModel.AppSettings.AiApiKeyProtected.Length > 0 ? "saved" : "";
+        }
+
+        private void OnAiSettingChanged(object sender, TextChangedEventArgs e)
+        {
+            _viewModel.AppSettings.AiBaseUrl = AiBaseUrlBox.Text.Trim();
+            _viewModel.AppSettings.AiModel = AiModelBox.Text.Trim();
+            _viewModel.AppSettings.AiExtraHeaders = AiHeadersBox.Text;
+        }
+
+        private void OnAiApiKeyChanged(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string password = AiApiKeyBox.Password;
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    _viewModel.AppSettings.AiApiKeyProtected = "";
+                    return;
+                }
+
+                // 占位串"saved"来自回填，不代表用户输入了新 Key
+                if (password == "saved")
+                {
+                    return;
+                }
+
+                string? protectedKey = Flint3.Helpers.LlmSecretProtector.Protect(password);
+                if (protectedKey is null)
+                {
+                    ShowAiMessage("API Key 加密失败，未能保存", InfoBarSeverity.Error);
+                    return;
+                }
+
+                _viewModel.AppSettings.AiApiKeyProtected = protectedKey;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+            }
+        }
+
+        private async void OnClickTestAiConnection(object sender, RoutedEventArgs e)
+        {
+            AiTestButton.IsEnabled = false;
+            AiTestProgress.Visibility = Visibility.Visible;
+            AiInfoBar.IsOpen = false;
+
+            LlmTranslationOutcome outcome;
+            try
+            {
+                outcome = await _viewModel.TestAiConnectionAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                ShowAiMessage("测试请求异常", InfoBarSeverity.Error);
+                return;
+            }
+            finally
+            {
+                AiTestButton.IsEnabled = true;
+                AiTestProgress.Visibility = Visibility.Collapsed;
+            }
+
+            if (outcome.Success)
+            {
+                ShowAiMessage($"连接成功：{TruncateForDisplay(outcome.Text, 40)}", InfoBarSeverity.Success);
+            }
+            else
+            {
+                ShowAiMessage(outcome.FailureMessage, InfoBarSeverity.Error);
+            }
+        }
+
+        private void ShowAiMessage(string message, InfoBarSeverity severity)
+        {
+            AiInfoBar.Severity = severity;
+            AiInfoBar.Message = message;
+            AiInfoBar.IsOpen = true;
+        }
+
+        private static string TruncateForDisplay(string text, int maxLength)
+        {
+            text = text.Replace("\r", " ").Replace("\n", " ").Trim();
+            return text.Length <= maxLength ? text : text[..maxLength] + "…";
+        }
+
+        #endregion
 
         /// <summary>
         /// 从磁盘重新读取 mdx 词库登记信息并刷新列表

@@ -71,6 +71,7 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,8,0,8" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                                         <Grid HorizontalAlignment="Stretch">
@@ -101,6 +102,13 @@
                                             Click="OnClickAddWordToGlossary">
                                         <Button.Content>
                                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE109;" FontSize="12" Opacity="0.8"/>
+                                        </Button.Content>
+                                    </Button>
+                                    <!--在主窗翻译：Lite 窗口不承载长文本，跳转到主窗并直接发起 AI 翻译-->
+                                    <Button Grid.Column="3" Padding="0" Height="32" Width="32" Margin="16,0,-8,0" Background="Transparent" BorderBrush="Transparent" ToolTipService.ToolTip="在主窗中 AI 翻译"
+                                            Click="OnClickTranslateInMainWindow">
+                                        <Button.Content>
+                                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE774;" FontSize="12" Opacity="0.8"/>
                                         </Button.Content>
                                     </Button>
                                 </Grid>

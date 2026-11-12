@@ -160,6 +160,25 @@ namespace Flint3.Views
             }
         }
 
+        /// <summary>
+        /// AI 翻译当前词条（手动触发）
+        /// </summary>
+        private void OnClickTranslateWord(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is StarDictWordItem item)
+            {
+                MainViewModel.Instance.TranslateWord(item);
+            }
+        }
+
+        /// <summary>
+        /// AI 翻译搜索框中的整句（不进入词条结果列表）
+        /// </summary>
+        private void OnClickTranslateSentence(object sender, RoutedEventArgs e)
+        {
+            MainViewModel.Instance.TranslateSentence(SearchTextBox?.Text);
+        }
+
         #region 功能介绍
 
         private void TryShowNewFeatureButton()

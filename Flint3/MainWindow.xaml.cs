@@ -92,6 +92,28 @@ namespace Flint3
         }
 
         /// <summary>
+        /// 把文本放入主窗搜索框并直接发起 AI 翻译；主窗不在搜索页时不生效
+        /// </summary>
+        public bool TryTranslateText(string? text)
+        {
+            if (MainFrame.Content is not FlintFullPage flintPage || string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            var searchTextBox = flintPage.SearchTextBox;
+            if (searchTextBox is null)
+            {
+                return false;
+            }
+
+            // 赋值触发 TextChanged -> MatchWord（含整句状态更新），随后直接发起翻译
+            searchTextBox.Text = text;
+            MainViewModel.Instance.TranslateSentence(text);
+            return true;
+        }
+
+        /// <summary>
         /// 窗口激活时自动聚焦到搜索框
         /// </summary>
         /// <param name="sender"></param>
