@@ -37,8 +37,9 @@
             <TextBlock Text="Flint" FontFamily="Times New Roman" Margin="20,0,0,4" FontWeight="Bold" FontSize="20" VerticalAlignment="Bottom" Opacity="0.9"/>
         </Grid>
 
-        <!--搜索框-->
-        <Grid Grid.Row="1" Padding="16,0" Margin="0,4,0,0">
+        <!--搜索框（AI 翻译模式下隐藏）-->
+        <Grid Grid.Row="1" Padding="16,0" Margin="0,4,0,0"
+              Visibility="{x:Bind ViewModel.IsResultsAreaVisible,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
             <TextBox x:Name="SearchTextBox" x:FieldModifier="public" TextChanged="SearchTextBox_TextChanged"/>
             <TextBlock Text="开始键入..." Margin="16,6,0,0" FontSize="17.5" Opacity="0.3" HorizontalAlignment="Left" IsHitTestVisible="False" VerticalAlignment="Top"
                        Visibility="{x:Bind SearchTextBox.Text.Length,Mode=OneWay,Converter={StaticResource Int2Vis},ConverterParameter=-}"/>
@@ -223,23 +224,44 @@
                             <Run Text="translate" FontStyle="Italic"/>
                             <Run Text="/trænzˈleɪt/"/>
                             <Run Text="verb" FontStyle="Italic" FontWeight="SemiBold"/>
-                            <Run Text="中英互译"/>
+                            <Run Text="多语互译"/>
                         </TextBlock>
                     </StackPanel>
                     <!--输入卡片-->
                     <TextBox x:Name="AiPanelInputBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="110" MaxHeight="260" FontSize="14" Padding="12,10" CornerRadius="4"
                              PlaceholderText="输入要翻译的句子或段落，中英均可..." ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-                    <!--操作行-->
-                    <Grid ColumnSpacing="10">
+                    <!--语言方向行：源 → 反转 → 目标 + 翻译按钮-->
+                    <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Height="34" Padding="20,0" CornerRadius="4" Style="{StaticResource AccentButtonStyle}" Click="OnClickAiPanelTranslate" Content="翻译"/>
-                        <muxc:ProgressRing Grid.Column="1" Width="20" Height="20" VerticalAlignment="Center"
+                        <ComboBox x:Name="PanelSourceBox" Grid.Column="0" Width="116" FontSize="13" MinHeight="32"
+                                  SelectedIndex="{x:Bind ViewModel.PanelSourceIndex,Mode=TwoWay}">
+                            <ComboBoxItem Content="自动检测" IsSelected="True"/>
+                            <ComboBoxItem Content="中文"/>
+                            <ComboBoxItem Content="英文"/>
+                            <ComboBoxItem Content="德文"/>
+                            <ComboBoxItem Content="日文"/>
+                        </ComboBox>
+                        <Button x:Name="SwapLanguageButton" Grid.Column="1" Padding="0" Height="32" Width="32" Background="Transparent" BorderBrush="Transparent"
+                                Click="OnClickSwapLanguages" ToolTipService.ToolTip="交换语言方向">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8AB;" FontSize="14" Opacity="0.75"/>
+                        </Button>
+                        <ComboBox x:Name="PanelTargetBox" Grid.Column="2" Width="116" FontSize="13" MinHeight="32"
+                                  SelectedIndex="{x:Bind ViewModel.PanelTargetIndex,Mode=TwoWay}">
+                            <ComboBoxItem Content="中文"/>
+                            <ComboBoxItem Content="英文" IsSelected="True"/>
+                            <ComboBoxItem Content="德文"/>
+                            <ComboBoxItem Content="日文"/>
+                        </ComboBox>
+                        <Button Grid.Column="4" Height="32" Padding="20,0" CornerRadius="4" Style="{StaticResource AccentButtonStyle}" Click="OnClickAiPanelTranslate" Content="翻译"/>
+                        <muxc:ProgressRing Grid.Column="5" Width="20" Height="20" VerticalAlignment="Center"
                                            Visibility="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
-                        <TextBlock Grid.Column="2" Text="自动识别中 ↔ 英方向" FontSize="12" Opacity="0.45" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                     </Grid>
                     <!--结果卡片-->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="14,12"

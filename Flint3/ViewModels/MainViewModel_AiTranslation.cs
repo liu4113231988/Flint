@@ -102,8 +102,44 @@ namespace Flint3.ViewModels
             IsAiTranslationMode = false;
         }
 
+        private int _panelSourceIndex = 1;
+
+        /// <summary>面板源语言索引：0 自动检测 / 1 中文 / 2 英文 / 3 德文 / 4 日文，默认中文</summary>
+        public int PanelSourceIndex
+        {
+            get => _panelSourceIndex;
+            set => SetProperty(ref _panelSourceIndex, value);
+        }
+
+        private int _panelTargetIndex = 1;
+
+        /// <summary>面板目标语言索引：0 中文 / 1 英文 / 2 德文 / 3 日文，默认英文（中译英）</summary>
+        public int PanelTargetIndex
+        {
+            get => _panelTargetIndex;
+            set => SetProperty(ref _panelTargetIndex, value);
+        }
+
         /// <summary>
-        /// 独立面板翻译：整段文本，自动识别方向
+        /// 快捷反转语言方向；源为自动检测时，目标默认镜像为英（英则中）
+        /// </summary>
+        public void SwapPanelLanguages()
+        {
+            int source = PanelSourceIndex, target = PanelTargetIndex;
+            if (source == 0)
+            {
+                PanelSourceIndex = target + 1;
+                PanelTargetIndex = target == 1 ? 0 : 1;
+            }
+            else
+            {
+                PanelSourceIndex = target + 1;
+                PanelTargetIndex = source - 1;
+            }
+        }
+
+        /// <summary>
+        /// 独立面板翻译：按源/目标语言对，整段文本
         /// </summary>
         public async void TranslatePanel(string rawText)
         {
@@ -121,6 +157,9 @@ namespace Flint3.ViewModels
                 return;
             }
 
+            TranslationLanguage source = (TranslationLanguage)Math.Clamp(PanelSourceIndex, 0, 4);
+            TranslationLanguage target = (TranslationLanguage)Math.Clamp(PanelTargetIndex + 1, 1, 4);
+
             SearchRequest request = _translationCoordinator.BeginRequest();
             AiTranslationItem panelState = new();
             PanelTranslation = panelState;
@@ -129,7 +168,7 @@ namespace Flint3.ViewModels
             LlmTranslationOutcome outcome;
             try
             {
-                outcome = await _translationService.TranslateAsync(options, text, TranslationDirection.Auto, request.Token);
+                outcome = await _translationService.TranslateAsync(options, text, source, target, request.Token);
             }
             catch (Exception ex)
             {

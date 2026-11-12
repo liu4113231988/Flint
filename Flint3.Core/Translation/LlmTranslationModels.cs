@@ -4,6 +4,41 @@ using System.Collections.Generic;
 namespace Flint3.Core.Translation
 {
     /// <summary>
+    /// 翻译语言（面板模式）：支持常用的中英德日，Auto 仅用于源语言
+    /// </summary>
+    public enum TranslationLanguage
+    {
+        Auto = 0,
+        Zh = 1,
+        En = 2,
+        De = 3,
+        Ja = 4,
+    }
+
+    public static class TranslationLanguageExtensions
+    {
+        public static string GetLabel(this TranslationLanguage language) => language switch
+        {
+            TranslationLanguage.Auto => "自动",
+            TranslationLanguage.Zh => "中",
+            TranslationLanguage.En => "英",
+            TranslationLanguage.De => "德",
+            TranslationLanguage.Ja => "日",
+            _ => "自动",
+        };
+
+        /// <summary>prompt 里的英文语言名</summary>
+        public static string GetEnglishName(this TranslationLanguage language) => language switch
+        {
+            TranslationLanguage.Zh => "Simplified Chinese",
+            TranslationLanguage.En => "English",
+            TranslationLanguage.De => "German",
+            TranslationLanguage.Ja => "Japanese",
+            _ => "English",
+        };
+    }
+
+    /// <summary>
     /// 翻译方向；Auto 表示按 CJK 字符占比自动识别
     /// </summary>
     public enum TranslationDirection

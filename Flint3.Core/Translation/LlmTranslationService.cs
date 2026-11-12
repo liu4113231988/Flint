@@ -25,6 +25,22 @@ namespace Flint3.Core.Translation
 
         private readonly OpenAiCompatibleClient _client = new();
 
+        /// <summary>
+        /// 面板模式：按源/目标语言对翻译（源可为 Auto，由模型检测）
+        /// </summary>
+        public async Task<LlmTranslationOutcome> TranslateAsync(LlmTranslationOptions options, string text, TranslationLanguage source, TranslationLanguage target, CancellationToken token)
+        {
+            string directionLabel = $"{source.GetLabel()} → {target.GetLabel()}";
+            (string systemPrompt, string userContent) = BuildPanelPrompt(source, target, text);
+            LlmTranslationOutcome outcome = await _client.CompleteAsync(options, systemPrompt, userContent, token);
+            if (outcome.Success)
+            {
+                return LlmTranslationOutcome.Ok(outcome.Text, directionLabel, outcome.PromptTokens, outcome.CompletionTokens, outcome.ElapsedMs, outcome.Truncated);
+            }
+
+            return outcome;
+        }
+
         public async Task<LlmTranslationOutcome> TranslateAsync(LlmTranslationOptions options, string text, TranslationDirection direction, CancellationToken token, string? referenceContext = null)
         {
             TranslationDirection resolved = direction == TranslationDirection.Auto ? TranslationDirectionDetector.Detect(text) : direction;
@@ -38,6 +54,17 @@ namespace Flint3.Core.Translation
             }
 
             return outcome;
+        }
+
+        private static (string System, string User) BuildPanelPrompt(TranslationLanguage source, TranslationLanguage target, string text)
+        {
+            string targetName = target.GetEnglishName();
+            string systemPrompt = source == TranslationLanguage.Auto
+                ? $"You are a concise translation assistant. Detect the language of the user's text and translate it into {targetName}. " +
+                  "Reply with the translation only, plain text, no quotes, no markdown, no explanations."
+                : $"You are a concise translation assistant. Translate the user's {source.GetEnglishName()} text into {targetName}. " +
+                  "Reply with the translation only, plain text, no quotes, no markdown, no explanations.";
+            return (systemPrompt, text);
         }
 
         private static (string System, string User) BuildPrompt(TranslationDirection direction, string text, string? referenceContext)

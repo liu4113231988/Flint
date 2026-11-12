@@ -226,6 +226,14 @@ namespace Flint3.Views
         }
 
         /// <summary>
+        /// 快捷反转语言方向（自动检测源时按约定镜像）
+        /// </summary>
+        private void OnClickSwapLanguages(object sender, RoutedEventArgs e)
+        {
+            ViewModel.SwapPanelLanguages();
+        }
+
+        /// <summary>
         /// AI 翻译搜索框中的整句（不进入词条结果列表）
         /// </summary>
         private void OnClickTranslateSentence(object sender, RoutedEventArgs e)
