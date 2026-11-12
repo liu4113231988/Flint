@@ -213,42 +213,61 @@
         <!--AI 翻译面板：底部独立入口，替代结果区显示-->
         <Grid Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
               Visibility="{x:Bind ViewModel.IsAiTranslationMode,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
-            <StackPanel Orientation="Vertical" Margin="16,8,16,8" Spacing="8">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="AI 翻译" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Opacity="0.85"/>
-                    <Button Grid.Column="1" Padding="0" Height="28" Width="28" Background="Transparent" BorderBrush="Transparent" Click="OnClickCloseAiPanel" ToolTipService.ToolTip="返回查词">
-                        <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8BB;" FontSize="12" Opacity="0.7"/>
-                    </Button>
-                </Grid>
-                <TextBox x:Name="AiPanelInputBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220" FontSize="14"
-                         PlaceholderText="输入要翻译的句子或段落..." ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="AiPanelTranslateButton" Grid.Column="0" Height="32" Padding="14,0" Style="{StaticResource AccentButtonStyle}" Click="OnClickAiPanelTranslate" Content="翻译"/>
-                    <muxc:ProgressRing x:Name="AiPanelProgress" Grid.Column="1" Width="20" Height="20"
-                                       Visibility="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
-                </Grid>
-                <StackPanel Orientation="Vertical" Spacing="4"
+            <ScrollViewer Padding="18,12,18,14" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel Orientation="Vertical" Spacing="10" MaxWidth="720" HorizontalAlignment="Stretch">
+                    <!--标题行：词典式注释 + 关闭-->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE774;" FontSize="15" Opacity="0.75" VerticalAlignment="Center"/>
+                            <TextBlock Text="AI 翻译" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock FontSize="12.5" Opacity="0.45" VerticalAlignment="Center" FontFamily="Times New Roman">
+                                <Run Text="translate" FontStyle="Italic"/>
+                                <Run Text="/trænzˈleɪt/"/>
+                                <Run Text="verb" FontStyle="Italic" FontWeight="SemiBold"/>
+                                <Run Text="中英互译"/>
+                            </TextBlock>
+                        </StackPanel>
+                        <Button Grid.Column="1" Padding="0" Height="30" Width="30" Background="Transparent" BorderBrush="Transparent" Click="OnClickCloseAiPanel" ToolTipService.ToolTip="返回查词">
+                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE894;" FontSize="13" Opacity="0.7"/>
+                        </Button>
+                    </Grid>
+                    <!--输入卡片-->
+                    <TextBox x:Name="AiPanelInputBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="110" MaxHeight="260" FontSize="14" Padding="12,10" CornerRadius="4"
+                             PlaceholderText="输入要翻译的句子或段落，中英均可..." ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                    <!--操作行-->
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Height="34" Padding="20,0" CornerRadius="4" Style="{StaticResource AccentButtonStyle}" Click="OnClickAiPanelTranslate" Content="翻译"/>
+                        <muxc:ProgressRing Grid.Column="1" Width="20" Height="20" VerticalAlignment="Center"
+                                           Visibility="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                        <TextBlock Grid.Column="2" Text="自动识别中 ↔ 英方向" FontSize="12" Opacity="0.45" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                    </Grid>
+                    <!--结果卡片-->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="14,12"
                             Visibility="{x:Bind ViewModel.PanelResultVisible,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
-                    <TextBlock Text="{x:Bind ViewModel.PanelTranslation.ResultText,Mode=OneWay}" Opacity="0.85" TextWrapping="Wrap" LineHeight="24" IsTextSelectionEnabled="True"
-                               Visibility="{x:Bind ViewModel.PanelTranslation.ResultText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
-                    <TextBlock Text="{x:Bind ViewModel.PanelTranslation.ErrorText,Mode=OneWay}" Opacity="0.7" FontSize="13" TextWrapping="Wrap"
-                               Visibility="{x:Bind ViewModel.PanelTranslation.ErrorText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
-                    <TextBlock Text="{x:Bind ViewModel.PanelTranslation.DetailText,Mode=OneWay}" Opacity="0.45" FontSize="11"
-                               Visibility="{x:Bind ViewModel.PanelTranslation.DetailText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
-                    <Button Content="重试" Height="28" Padding="12,0" HorizontalAlignment="Left" Click="OnClickAiPanelTranslate"
-                            Visibility="{x:Bind ViewModel.PanelTranslation.CanRetry,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                        <StackPanel Orientation="Vertical" Spacing="6">
+                            <TextBlock Text="{x:Bind ViewModel.PanelTranslation.ResultText,Mode=OneWay}" FontSize="14" Opacity="0.88" TextWrapping="Wrap" LineHeight="26" IsTextSelectionEnabled="True"
+                                       Visibility="{x:Bind ViewModel.PanelTranslation.ResultText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                            <TextBlock Text="{x:Bind ViewModel.PanelTranslation.ErrorText,Mode=OneWay}" FontSize="13" Opacity="0.75" TextWrapping="Wrap" LineHeight="22"
+                                       Visibility="{x:Bind ViewModel.PanelTranslation.ErrorText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                            <TextBlock Text="{x:Bind ViewModel.PanelTranslation.DetailText,Mode=OneWay}" FontSize="11" Opacity="0.45" TextWrapping="Wrap"
+                                       Visibility="{x:Bind ViewModel.PanelTranslation.DetailText,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                            <Button Content="重试" Height="30" Padding="14,0" CornerRadius="4" HorizontalAlignment="Left" Click="OnClickAiPanelTranslate"
+                                    Visibility="{x:Bind ViewModel.PanelTranslation.CanRetry,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                        </StackPanel>
+                    </Border>
+                    <!--出站告知脚注-->
+                    <TextBlock Text="查询文本将发送至你在设置中配置的接口，燧石不中转、不收集" FontSize="11" Opacity="0.4" TextWrapping="Wrap"/>
                 </StackPanel>
-                <TextBlock Text="查询文本将发送至你在设置中配置的接口，燧石不中转、不收集" FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
-            </StackPanel>
+            </ScrollViewer>
         </Grid>
 
         <!--工具栏-->
