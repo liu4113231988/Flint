@@ -40,6 +40,8 @@ namespace Flint3.ViewModels
             InitViewModel4Flint();
             InitViewModel4Glossary();
             InitViewModel4ShortcutKeys();
+            InitViewModel4Selection();
+            InitViewModel4ScreenCapture();
         }
     }
 }

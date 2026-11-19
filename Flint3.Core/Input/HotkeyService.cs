@@ -96,6 +96,11 @@ namespace Flint3.Core.Input
 
         private bool FilterKeyboardEvent(KeyboardEvent ev)
         {
+            if (ev.ExtraInfo == InputSimulator.InjectedKeyMarker)
+            {
+                return false;
+            }
+
             _pressedWin = InputSimulator.IsKeyDown(VkLWin) || InputSimulator.IsKeyDown(VkRWin);
             _pressedCtrl = InputSimulator.IsKeyDown(VkControl);
             _pressedAlt = InputSimulator.IsKeyDown(VkMenu);

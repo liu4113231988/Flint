@@ -75,6 +75,9 @@ namespace Flint3.ViewModels
                 RegisterShortcut(newHotkey, OnShortcutActivated);
             }
 
+            // 唤醒热键变化后重新校准划词热键（同组合键冲突时划词让位）
+            UpdateSelectionRegistration();
+
             await SaveShortcutSettings();
         }
 
@@ -161,7 +164,18 @@ namespace Flint3.ViewModels
                         _hotkeyService?.Unregister(_hotkeyHandle);
                     }
 
+                    if (_selectionHotkeyHandle != 0)
+                    {
+                        _hotkeyService?.Unregister(_selectionHotkeyHandle);
+                    }
+
+                    if (_screenCaptureHotkeyHandle != 0)
+                    {
+                        _hotkeyService?.Unregister(_screenCaptureHotkeyHandle);
+                    }
+
                     _hotkeyService?.Dispose();
+                    DisposeAutoSelectionMonitor();
                     _wordQueryService?.Dispose();
                     _searchCoordinator.Dispose();
                     _translationCoordinator.Dispose();

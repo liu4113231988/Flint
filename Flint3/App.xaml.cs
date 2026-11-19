@@ -130,6 +130,13 @@ namespace Flint3
                     }
                 };
 
+                // 右键菜单"自动划词"勾选开关（菜单在 UI 线程弹出，直接切换即可）
+                NotifyIcon.AutoSelectionStateProvider = () => MainViewModel.Instance.SelectionAutoEnabled;
+                NotifyIcon.OnClickToggleAutoSelection += () =>
+                {
+                    MainViewModel.Instance.SelectionAutoEnabled = !MainViewModel.Instance.SelectionAutoEnabled;
+                };
+
                 NotifyIcon.CreateNotifyIcon();
             }
             catch (Exception ex)
@@ -203,9 +210,9 @@ namespace Flint3
         }
 
         /// <summary>
-        /// 弹出燧石简洁窗口
+        /// 弹出燧石简洁窗口；atCursor 为 true 时贴近鼠标位置（划词翻译），否则在显示器上方居中
         /// </summary>
-        public static void ShowLiteWindow()
+        public static void ShowLiteWindow(bool atCursor = false)
         {
             FlintMainWindow?.Hide();
 
@@ -243,10 +250,29 @@ namespace Flint3
 
                 var w = (int)(width * scalingFactor);
                 var h = (int)(height * scalingFactor);
-                var cx = (info.rcMonitor.left + info.rcMonitor.right) / 2;
-                var cy = (info.rcMonitor.bottom + info.rcMonitor.top) / 4;
-                var left = cx - (w / 2);
-                var top = cy;
+                int left, top;
+                if (atCursor)
+                {
+                    // 光标右下方弹出，超出工作区时翻转到另一侧
+                    left = pt.X + 16;
+                    top = pt.Y + 16;
+                    if (left + w > info.rcWork.right)
+                    {
+                        left = Math.Max(info.rcWork.left, pt.X - w - 16);
+                    }
+
+                    if (top + h > info.rcWork.bottom)
+                    {
+                        top = Math.Max(info.rcWork.top, pt.Y - h - 16);
+                    }
+                }
+                else
+                {
+                    var cx = (info.rcMonitor.left + info.rcMonitor.right) / 2;
+                    var cy = (info.rcMonitor.bottom + info.rcMonitor.top) / 4;
+                    left = cx - (w / 2);
+                    top = cy;
+                }
 
                 IntPtr hwnd = FlintLiteWindow.GetWindowHandle();
                 bool result = PInvoke.SetWindowPos(new HWND(hwnd), new HWND(), left, top, w, h, (SET_WINDOW_POS_FLAGS)0);

@@ -258,6 +258,78 @@
                     <control:ShortcutControl x:Name="ShortcutSettingControl" Margin="0,-4" HotkeySettings="{x:Bind _viewModel.ActivationShortcut,Mode=TwoWay}"/>
                 </labs:SettingsCard>
 
+                <!--划词翻译设置-->
+                <labs:SettingsCard x:Name="SelectionTranslationSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch">
+                    <labs:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8C8;"/>
+                    </labs:SettingsCard.HeaderIcon>
+                    <labs:SettingsCard.Header>
+                        <TextBlock Text="划词翻译"/>
+                    </labs:SettingsCard.Header>
+                    <labs:SettingsCard.Description>
+                        <TextBlock Text="选中文字后按快捷键自动取词查询；整句交给 AI 翻译（需在下方开启）"/>
+                    </labs:SettingsCard.Description>
+                    <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionTranslationEnabled,Mode=TwoWay}"/>
+                </labs:SettingsCard>
+
+                <!--划词翻译快捷键-->
+                <labs:SettingsCard x:Name="SelectionShortcutSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch"
+                                   IsEnabled="{x:Bind _viewModel.SelectionTranslationEnabled,Mode=OneWay}">
+                    <labs:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xEDA7;"/>
+                    </labs:SettingsCard.HeaderIcon>
+                    <labs:SettingsCard.Header>
+                        <TextBlock Text="划词快捷键"/>
+                    </labs:SettingsCard.Header>
+                    <labs:SettingsCard.Description>
+                        <TextBlock Text="自定义划词取词的快捷键"/>
+                    </labs:SettingsCard.Description>
+                    <control:ShortcutControl x:Name="SelectionShortcutSettingControl" Margin="0,-4" HotkeySettings="{x:Bind _viewModel.SelectionShortcut,Mode=TwoWay}"/>
+                </labs:SettingsCard>
+
+                <!--自动划词设置-->
+                <labs:SettingsCard x:Name="SelectionAutoSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch">
+                    <labs:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE945;"/>
+                    </labs:SettingsCard.HeaderIcon>
+                    <labs:SettingsCard.Header>
+                        <TextBlock Text="自动划词"/>
+                    </labs:SettingsCard.Header>
+                    <labs:SettingsCard.Description>
+                        <TextBlock Text="选中文字后自动取词查询，无需按快捷键；也可在托盘图标右键菜单快速开关"/>
+                    </labs:SettingsCard.Description>
+                    <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionAutoEnabled,Mode=TwoWay}"/>
+                </labs:SettingsCard>
+
+                <!--屏幕取词设置-->
+                <labs:SettingsCard x:Name="ScreenCaptureSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch">
+                    <labs:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE721;"/>
+                    </labs:SettingsCard.HeaderIcon>
+                    <labs:SettingsCard.Header>
+                        <TextBlock Text="屏幕取词"/>
+                    </labs:SettingsCard.Header>
+                    <labs:SettingsCard.Description>
+                        <TextBlock Text="按快捷键冻结屏幕，拖选区域或单击文字取词查询（需系统已安装 OCR 语言包）"/>
+                    </labs:SettingsCard.Description>
+                    <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.ScreenCaptureEnabled,Mode=TwoWay}"/>
+                </labs:SettingsCard>
+
+                <!--屏幕取词快捷键-->
+                <labs:SettingsCard x:Name="ScreenCaptureShortcutSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch"
+                                   IsEnabled="{x:Bind _viewModel.ScreenCaptureEnabled,Mode=OneWay}">
+                    <labs:SettingsCard.HeaderIcon>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xEDA7;"/>
+                    </labs:SettingsCard.HeaderIcon>
+                    <labs:SettingsCard.Header>
+                        <TextBlock Text="取词快捷键"/>
+                    </labs:SettingsCard.Header>
+                    <labs:SettingsCard.Description>
+                        <TextBlock Text="自定义屏幕取词的快捷键"/>
+                    </labs:SettingsCard.Description>
+                    <control:ShortcutControl x:Name="ScreenCaptureShortcutSettingControl" Margin="0,-4" HotkeySettings="{x:Bind _viewModel.ScreenCaptureShortcut,Mode=TwoWay}"/>
+                </labs:SettingsCard>
+
                 <!--快捷键窗口模式-->
                 <labs:SettingsCard x:Name="WindowModeSettingsCard" x:Load="True" Margin="16,2,16,0" HorizontalAlignment="Stretch">
                     <labs:SettingsCard.HeaderIcon>

@@ -73,6 +73,8 @@ namespace Flint3.Helpers
         public const int MF_MENUBARBREAK = 0x00000020;
         public const int MF_MENUBREAK = 0x00000040;
         public const int MF_SEPARATOR = 0x00000800;
+        public const int MF_CHECKED = 0x00000008;
+        public const int MF_UNCHECKED = 0x00000000;
 
         [DllImport("User32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern uint TrackPopupMenu(IntPtr hMenu, uint uFlags, int x, int y, int nReserved, IntPtr hWnd, IntPtr prcRect);
@@ -138,6 +140,12 @@ namespace Flint3.Helpers
         internal event Action OnClickShowMainWindow = null;
         internal event Action OnClickExitApp = null;
         internal event Action OnClickCloseWindow = null;
+        internal event Action OnClickToggleAutoSelection = null;
+
+        /// <summary>
+        /// 提供"自动划词"当前开关状态，用于右键菜单勾选标记
+        /// </summary>
+        internal Func<bool> AutoSelectionStateProvider = null;
 
         internal NotifyIcon(nint hwndMain, string iconPath)
         {
@@ -176,19 +184,24 @@ namespace Flint3.Helpers
                                     GetCursorPos(out Windows.Graphics.PointInt32 ptCursor);
 
                                     IntPtr hMenu = CreatePopupMenu();
-                                    int i = 1;
-                                    AppendMenu(hMenu, MF_STRING, (IntPtr)i, "显示窗口");
-                                    i += 1;
-                                    // 添加分割线 AppendMenu(hMenu, MF_SEPARATOR, (IntPtr)i, null); i += 1;
-                                    AppendMenu(hMenu, MF_STRING, (IntPtr)i, "退出");
+                                    AppendMenu(hMenu, MF_STRING, (IntPtr)1, "显示窗口");
+                                    bool autoOn = this.AutoSelectionStateProvider?.Invoke() ?? false;
+                                    AppendMenu(hMenu, (uint)(MF_STRING | (autoOn ? MF_CHECKED : MF_UNCHECKED)), (IntPtr)3, "自动划词");
+                                    AppendMenu(hMenu, MF_SEPARATOR, IntPtr.Zero, null);
+                                    AppendMenu(hMenu, MF_STRING, (IntPtr)2, "退出");
                                     SetForegroundWindow(hWnd);
                                     uint nCmd = TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_RIGHTBUTTON | TPM_RETURNCMD, ptCursor.X, ptCursor.Y, 0, hWnd, IntPtr.Zero);
                                     _ = PostMessage(hWnd, 0x0000, IntPtr.Zero, IntPtr.Zero);
+                                    DestroyMenu(hMenu);
                                     if (nCmd != 0)
                                     {
-                                        if (nCmd == i)
+                                        if (nCmd == 2)
                                         {
                                             this.OnClickExitApp?.Invoke();
+                                        }
+                                        else if (nCmd == 3)
+                                        {
+                                            this.OnClickToggleAutoSelection?.Invoke();
                                         }
                                         else if (nCmd == 1)
                                         {
