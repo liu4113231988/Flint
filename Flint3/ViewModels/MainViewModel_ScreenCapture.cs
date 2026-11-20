@@ -18,6 +18,32 @@ namespace Flint3.ViewModels
 
         private ushort _screenCaptureHotkeyHandle;
 
+        public string ScreenCaptureShortcutStatus
+        {
+            get
+            {
+                if (!ScreenCaptureEnabled)
+                {
+                    return string.Empty;
+                }
+
+                ushort handle = HotkeyService.GetHotkeyHandle(ScreenCaptureShortcut);
+                if (handle == HotkeyService.GetHotkeyHandle(ActivationShortcut ?? _defaultActivationShortcut))
+                {
+                    return "与唤醒窗口的快捷键冲突，请修改组合键";
+                }
+
+                if (SelectionTranslationEnabled && handle == HotkeyService.GetHotkeyHandle(SelectionShortcut))
+                {
+                    return "与划词快捷键冲突，请修改组合键";
+                }
+
+                return _screenCaptureHotkeyHandle != 0 && _hotkeyService?.IsHookInstalled == true
+                    ? string.Empty
+                    : "屏幕取词快捷键未生效";
+            }
+        }
+
         /// <summary>
         /// 是否启用屏幕取词
         /// </summary>
@@ -101,6 +127,10 @@ namespace Flint3.ViewModels
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex);
+            }
+            finally
+            {
+                OnPropertyChanged(nameof(ScreenCaptureShortcutStatus));
             }
         }
 

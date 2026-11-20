@@ -21,6 +21,7 @@
         <cvt:Int2VisibilityConverter x:Key="Int2Vis"/>
         <cvt:Equal2BoolConverter x:Key="Eql2Bool"/>
         <cvt:Bool2VisibilityConverter x:Key="Bool2Vis"/>
+        <cvt:NullOrEmpty2VisibilityConverter x:Key="Null2Vis"/>
         <cvt:NullOrEmpty2VisibilityConverter x:Key="Str2Vis"/>
     </Page.Resources>
 
@@ -267,7 +268,7 @@
                         <TextBlock Text="划词翻译"/>
                     </labs:SettingsCard.Header>
                     <labs:SettingsCard.Description>
-                        <TextBlock Text="选中文字后按快捷键自动取词查询；整句交给 AI 翻译（需在下方开启）"/>
+                        <TextBlock Text="按快捷键预览选区并查询本地词典。启用 AI 翻译后，可点击「翻译原文」。" TextWrapping="Wrap"/>
                     </labs:SettingsCard.Description>
                     <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionTranslationEnabled,Mode=TwoWay}"/>
                 </labs:SettingsCard>
@@ -282,7 +283,11 @@
                         <TextBlock Text="划词快捷键"/>
                     </labs:SettingsCard.Header>
                     <labs:SettingsCard.Description>
-                        <TextBlock Text="自定义划词取词的快捷键"/>
+                        <StackPanel>
+                            <TextBlock Text="自定义划词取词的快捷键"/>
+                            <TextBlock Text="{x:Bind _viewModel.SelectionShortcutStatus,Mode=OneWay}" TextWrapping="Wrap"
+                                       Visibility="{x:Bind _viewModel.SelectionShortcutStatus,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                        </StackPanel>
                     </labs:SettingsCard.Description>
                     <control:ShortcutControl x:Name="SelectionShortcutSettingControl" Margin="0,-4" HotkeySettings="{x:Bind _viewModel.SelectionShortcut,Mode=TwoWay}"/>
                 </labs:SettingsCard>
@@ -299,6 +304,18 @@
                         <TextBlock Text="选中文字后自动取词查询，无需按快捷键；也可在托盘图标右键菜单快速开关"/>
                     </labs:SettingsCard.Description>
                     <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionAutoEnabled,Mode=TwoWay}"/>
+                </labs:SettingsCard>
+
+                <labs:SettingsCard Margin="16,2,16,0" HorizontalAlignment="Stretch"
+                                   IsEnabled="{x:Bind _viewModel.SelectionAutoEnabled,Mode=OneWay}"
+                                   Visibility="{x:Bind _viewModel.AppSettings.EnableAiTranslation,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
+                    <labs:SettingsCard.Header>
+                        <TextBlock Text="自动划词时发送给 AI"/>
+                    </labs:SettingsCard.Header>
+                    <labs:SettingsCard.Description>
+                        <TextBlock Text="开启后，自动划词中本地未命中的句子会发送至已配置的模型接口。" TextWrapping="Wrap"/>
+                    </labs:SettingsCard.Description>
+                    <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionAutoTranslate,Mode=TwoWay}"/>
                 </labs:SettingsCard>
 
                 <!--屏幕取词设置-->
@@ -325,7 +342,11 @@
                         <TextBlock Text="取词快捷键"/>
                     </labs:SettingsCard.Header>
                     <labs:SettingsCard.Description>
-                        <TextBlock Text="自定义屏幕取词的快捷键"/>
+                        <StackPanel>
+                            <TextBlock Text="自定义屏幕取词的快捷键"/>
+                            <TextBlock Text="{x:Bind _viewModel.ScreenCaptureShortcutStatus,Mode=OneWay}" TextWrapping="Wrap"
+                                       Visibility="{x:Bind _viewModel.ScreenCaptureShortcutStatus,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
+                        </StackPanel>
                     </labs:SettingsCard.Description>
                     <control:ShortcutControl x:Name="ScreenCaptureShortcutSettingControl" Margin="0,-4" HotkeySettings="{x:Bind _viewModel.ScreenCaptureShortcut,Mode=TwoWay}"/>
                 </labs:SettingsCard>

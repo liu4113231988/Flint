@@ -92,25 +92,19 @@ namespace Flint3
         }
 
         /// <summary>
-        /// 把文本放入主窗搜索框并直接发起 AI 翻译；主窗不在搜索页时不生效
+        /// 打开主窗翻译面板并提交原文。
         /// </summary>
-        public bool TryTranslateText(string? text)
+        public void TranslateText(string text)
         {
-            if (MainFrame.Content is not FlintFullPage flintPage || string.IsNullOrWhiteSpace(text))
+            if (MainFrame.Content is not FlintFullPage)
             {
-                return false;
+                MainFrame.Navigate(typeof(FlintFullPage));
             }
 
-            var searchTextBox = flintPage.SearchTextBox;
-            if (searchTextBox is null)
+            if (MainFrame.Content is FlintFullPage flintPage)
             {
-                return false;
+                flintPage.TranslateText(text);
             }
-
-            // 赋值触发 TextChanged -> MatchWord（含整句状态更新），随后直接发起翻译
-            searchTextBox.Text = text;
-            MainViewModel.Instance.TranslateSentence(text);
-            return true;
         }
 
         /// <summary>
@@ -134,7 +128,10 @@ namespace Flint3
         private void OnMainFrameLoaded(object sender, RoutedEventArgs e)
         {
             // 初始导航页面
-            MainFrame.Navigate(typeof(FlintFullPage));
+            if (MainFrame.Content is null)
+            {
+                MainFrame.Navigate(typeof(FlintFullPage));
+            }
 
             this.UpdateAppTheme();
 

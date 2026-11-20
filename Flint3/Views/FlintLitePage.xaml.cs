@@ -48,10 +48,53 @@ namespace Flint3.Views
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void SearchTextBox_TextChanging(TextBox sender, TextBoxTextChangingEventArgs e)
         {
-            App.FlintLiteWindow.Height = string.IsNullOrWhiteSpace(SearchTextBox?.Text) ? 64 : 386;
-            MainViewModel.Instance.MatchWord(SearchTextBox?.Text, false);
+            _capturedText = null;
+            CancelAutomaticTranslation();
+            bool hasText = !string.IsNullOrWhiteSpace(sender.Text);
+            TranslateOriginalButton.IsEnabled = hasText;
+            App.FlintLiteWindow.Height = hasText ? 386 : 64;
+            ViewModel.MatchWord(sender.Text, false);
+        }
+
+        private string? _capturedText;
+        private int _captureVersion;
+
+        internal void CancelAutomaticTranslation() => _captureVersion++;
+
+        internal void ClearInput()
+        {
+            CancelAutomaticTranslation();
+            _capturedText = null;
+            SearchTextBox.Text = string.Empty;
+        }
+
+        internal async void ShowCapturedText(string text, bool autoTranslate)
+        {
+            SearchTextBox.Text = text.ReplaceLineEndings(" ");
+            _capturedText = text;
+            int version = ++_captureVersion;
+            if (await ViewModel.PreviewCapturedTextAsync(text, autoTranslate)
+                && version == _captureVersion
+                && ViewModel.SelectionAutoEnabled && ViewModel.SelectionAutoTranslate && ViewModel.AppSettings.EnableAiTranslation)
+            {
+                TranslateInMainWindow(text);
+            }
+        }
+
+        private void OnClickTranslateOriginal(object sender, RoutedEventArgs e)
+        {
+            TranslateInMainWindow(_capturedText ?? SearchTextBox.Text);
+        }
+
+        private static void TranslateInMainWindow(string text)
+        {
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                App.ShowMainWindow();
+                App.FlintMainWindow?.TranslateText(text);
+            }
         }
 
         /// <summary>
@@ -76,8 +119,7 @@ namespace Flint3.Views
         {
             if (sender is Button btn && btn.DataContext is StarDictWordItem item && !string.IsNullOrWhiteSpace(item.Word))
             {
-                App.ShowMainWindow();
-                App.FlintMainWindow?.TryTranslateText(item.Word);
+                TranslateInMainWindow(item.Word);
             }
         }
 

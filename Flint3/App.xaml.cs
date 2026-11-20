@@ -240,7 +240,7 @@ namespace Flint3
                 info.cbSize = 40;
                 PInvoke.GetMonitorInfo(hwndDesktop, ref info);
                 int width = 540;
-                int height = searchEmpty ? 64 : 386;
+                int height = searchEmpty && !atCursor ? 64 : 386;
 
                 PInvoke.GetDpiForMonitor(hwndDesktop, Windows.Win32.UI.HiDpi.MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out uint dpiX, out uint dpiY);
                 var scalingFactor = dpiX / 96d;

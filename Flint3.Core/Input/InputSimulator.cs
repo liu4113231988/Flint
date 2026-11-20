@@ -15,13 +15,6 @@ namespace Flint3.Core.Input
         /// </summary>
         public const nuint InjectedKeyMarker = 0x464C494E;
 
-        private const int VkShift = 0x10;
-        private const int VkControl = 0x11;
-        private const int VkMenu = 0x12;
-        private const int VkLWin = 0x5B;
-        private const int VkRWin = 0x5C;
-        private const int VkC = 0x43;
-
         /// <summary>
         /// 发送单个按键事件，extraInfo 用于让钩子忽略自己注入的按键
         /// </summary>
@@ -41,44 +34,12 @@ namespace Flint3.Core.Input
         /// </summary>
         public static void SuppressStartMenu()
         {
-            SendKey(0xFF, keyUp: true);
+            SendKey(0xFF, keyUp: true, InjectedKeyMarker);
         }
 
         public static bool IsKeyDown(int virtualKey)
         {
             return (Flint3CorePInvoke.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-        }
-
-        /// <summary>
-        /// 注入 Ctrl+C 复制当前选中文本；全部带注入标记，避免触发自家热键
-        /// </summary>
-        public static void SendCtrlC()
-        {
-            SendKey(VkControl, keyUp: false, InjectedKeyMarker);
-            SendKey(VkC, keyUp: false, InjectedKeyMarker);
-            SendKey(VkC, keyUp: true, InjectedKeyMarker);
-            SendKey(VkControl, keyUp: true, InjectedKeyMarker);
-        }
-
-        /// <summary>
-        /// 抬起用户仍按住的修饰键，保证注入的 Ctrl+C 不被物理按住的 Alt/Win 等污染
-        /// </summary>
-        public static void ReleaseHeldModifiers()
-        {
-            bool winHeld = false;
-            foreach (int vk in new[] { VkShift, VkControl, VkMenu, VkLWin, VkRWin })
-            {
-                if (IsKeyDown(vk))
-                {
-                    SendKey((ushort)vk, keyUp: true, InjectedKeyMarker);
-                    winHeld |= vk == VkLWin || vk == VkRWin;
-                }
-            }
-
-            if (winHeld)
-            {
-                SuppressStartMenu();
-            }
         }
     }
 }

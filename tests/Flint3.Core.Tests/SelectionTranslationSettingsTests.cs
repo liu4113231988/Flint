@@ -16,6 +16,7 @@ namespace Flint3.Core.Tests
             Assert.Equal(new HotkeySettings(false, true, true, false, 0x44).ToString(), settings.Hotkey.ToString());
             Assert.True(settings.Hotkey.IsValid());
             Assert.False(settings.AutoEnabled);
+            Assert.False(settings.AutoTranslate);
         }
 
         [Fact]
@@ -25,7 +26,8 @@ namespace Flint3.Core.Tests
             {
                 Enabled = false,
                 Hotkey = new HotkeySettings(true, false, false, true, 0x70),
-                AutoEnabled = true
+                AutoEnabled = true,
+                AutoTranslate = true
             };
 
             string json = JsonSerializer.Serialize(settings, FlintJsonContext.Default.SelectionTranslationSettings);
@@ -35,6 +37,17 @@ namespace Flint3.Core.Tests
             Assert.False(restored.Enabled);
             Assert.Equal(settings.Hotkey.ToString(), restored.Hotkey.ToString());
             Assert.True(restored.AutoEnabled);
+            Assert.True(restored.AutoTranslate);
+        }
+
+        [Fact]
+        public void Deserialize_LegacyAutomaticSelectionDoesNotEnableAutomaticTranslation()
+        {
+            var restored = JsonSerializer.Deserialize("{\"autoEnabled\":true}", FlintJsonContext.Default.SelectionTranslationSettings);
+
+            Assert.NotNull(restored);
+            Assert.True(restored.AutoEnabled);
+            Assert.False(restored.AutoTranslate);
         }
 
         [Fact]

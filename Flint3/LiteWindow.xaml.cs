@@ -73,19 +73,16 @@ namespace Flint3
         {
             if (FlintLitePage?.SearchTextBox is not null)
             {
-                FlintLitePage.SearchTextBox.Text = "";
+                FlintLitePage.ClearInput();
             }
         }
 
         /// <summary>
         /// 回填搜索框文本（划词翻译），赋值触发 TextChanged 走既有查词链路
         /// </summary>
-        public void TrySetSearchTextBoxText(string text)
+        public void ShowCapturedText(string text, bool autoTranslate)
         {
-            if (FlintLitePage?.SearchTextBox is not null)
-            {
-                FlintLitePage.SearchTextBox.Text = text;
-            }
+            FlintLitePage?.ShowCapturedText(text, autoTranslate);
         }
 
         /// <summary>
@@ -106,6 +103,7 @@ namespace Flint3
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
+                FlintLitePage?.CancelAutomaticTranslation();
                 this.Hide();
             }
             else
@@ -126,7 +124,6 @@ namespace Flint3
             if (sender is FlintLitePage page)
             {
                 page.KeyboardAccelerators.Add(BuildKeyboardAccelerator(VirtualKey.Escape, null, OnHideKeyboardAcceleratorInvoked));
-                page.KeyboardAccelerators.Add(BuildKeyboardAccelerator(VirtualKey.Tab, null, OnSearchKeyboardAcceleratorInvoked));
             }
         }
 
@@ -229,17 +226,8 @@ namespace Flint3
             try
             {
                 args.Handled = true;
+                FlintLitePage?.CancelAutomaticTranslation();
                 this.Hide();
-            }
-            catch { args.Handled = false; }
-        }
-
-        private void OnSearchKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-        {
-            try
-            {
-                args.Handled = true;
-                TryFocusOnSearchTextBox();
             }
             catch { args.Handled = false; }
         }

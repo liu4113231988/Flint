@@ -261,8 +261,8 @@
                         </ComboBox>
                         <Button Grid.Column="4" Height="32" Padding="20,0" CornerRadius="4" Style="{StaticResource AccentButtonStyle}" Click="OnClickAiPanelTranslate" Content="翻译"/>
                         <muxc:ProgressRing Grid.Column="5" Width="20" Height="20" VerticalAlignment="Center"
-                                           IsActive="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay}"
-                                           Visibility="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis}}"/>
+                                           IsActive="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay,FallbackValue=False}"
+                                           Visibility="{x:Bind ViewModel.PanelTranslation.IsRunning,Mode=OneWay,Converter={StaticResource Bool2Vis},FallbackValue=Collapsed}"/>
                     </Grid>
                     <!--结果卡片-->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4" Padding="14,12"

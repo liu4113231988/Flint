@@ -144,7 +144,7 @@ namespace Flint3.ViewModels
         public async void TranslatePanel(string rawText)
         {
             string text = rawText?.Trim() ?? "";
-            if (text.Length == 0 || IsPatternInput(text))
+            if (text.Length == 0)
             {
                 return;
             }
@@ -204,16 +204,16 @@ namespace Flint3.ViewModels
         }
 
         /// <summary>
-        /// 整句判定：含空白，或 CJK 字符 ≥ 8；通配符输入不视为整句
+        /// 用空白、句末标点和汉字长度识别可能的整句。
         /// </summary>
         private static bool IsSentenceInput(string input)
         {
-            if (string.IsNullOrWhiteSpace(input) || IsPatternInput(input))
+            if (string.IsNullOrWhiteSpace(input))
             {
                 return false;
             }
 
-            if (input.Contains(' ') || input.Contains('\t'))
+            if (input.AsSpan().IndexOfAny("。？！?!") >= 0)
             {
                 return true;
             }
@@ -221,6 +221,11 @@ namespace Flint3.ViewModels
             int cjk = 0;
             foreach (char c in input)
             {
+                if (char.IsWhiteSpace(c))
+                {
+                    return true;
+                }
+
                 if (c >= '\u4E00' && c <= '\u9FFF' && ++cjk >= 8)
                 {
                     return true;
@@ -367,7 +372,7 @@ namespace Flint3.ViewModels
         public async void TranslateSentence(string rawText)
         {
             string text = rawText?.Trim() ?? "";
-            if (text.Length == 0 || IsPatternInput(text))
+            if (text.Length == 0)
             {
                 return;
             }

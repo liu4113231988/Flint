@@ -9,7 +9,7 @@ using Flint3.Helpers;
 namespace Flint3.ViewModels
 {
     /// <summary>
-    /// 划词翻译：全局热键触发取词，单词/短语在光标旁的简洁窗口查词典，整句走已开启的 AI 翻译
+    /// 划词取词：在光标旁预览选区并查词，自动发送由独立设置控制。
     /// </summary>
     public partial class MainViewModel : ObservableObject
     {
@@ -80,6 +80,41 @@ namespace Flint3.ViewModels
             }
         }
 
+        public bool SelectionAutoTranslate
+        {
+            get => _selectionSettings.AutoTranslate;
+            set
+            {
+                if (_selectionSettings.AutoTranslate != value)
+                {
+                    _selectionSettings.AutoTranslate = value;
+                    OnPropertyChanged();
+                    _ = SaveSelectionSettings();
+                }
+            }
+        }
+
+        public string SelectionShortcutStatus
+        {
+            get
+            {
+                if (!SelectionTranslationEnabled)
+                {
+                    return string.Empty;
+                }
+
+                if (HotkeyService.GetHotkeyHandle(SelectionShortcut) ==
+                    HotkeyService.GetHotkeyHandle(ActivationShortcut ?? _defaultActivationShortcut))
+                {
+                    return "与唤醒窗口的快捷键冲突，请修改组合键";
+                }
+
+                return _selectionHotkeyHandle != 0 && _hotkeyService?.IsHookInstalled == true
+                    ? string.Empty
+                    : "划词快捷键未生效";
+            }
+        }
+
         private async void InitViewModel4Selection()
         {
             await ReadSelectionSettings();
@@ -123,6 +158,7 @@ namespace Flint3.ViewModels
             }
             finally
             {
+                OnPropertyChanged(nameof(SelectionShortcutStatus));
                 // 划词热键变化后校准屏幕取词热键（同组合键冲突时取词让位）
                 UpdateScreenCaptureRegistration();
             }
@@ -207,26 +243,25 @@ namespace Flint3.ViewModels
                 return;
             }
 
-            this.Dispatcher.TryEnqueue(() => ShowSelectionResult(text));
+            this.Dispatcher.TryEnqueue(() =>
+            {
+                if (SelectionAutoEnabled)
+                {
+                    ShowSelectionResult(text, autoTranslate: SelectionAutoTranslate && AppSettings.EnableAiTranslation);
+                }
+            });
         }
 
-        private void ShowSelectionResult(string? text)
+        private void ShowSelectionResult(string? text, bool autoTranslate = false)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                ShowLiteHint("未获取到选中文本：请先在其他应用中选中文字，再按快捷键");
-                return;
-            }
-
-            if (IsSentenceInput(text) && this.AppSettings.EnableAiTranslation)
-            {
-                App.ShowMainWindow();
-                App.FlintMainWindow?.TryTranslateText(text);
+                ShowLiteHint("未读取到选区。请先选中文字，或使用屏幕取词、手动复制并粘贴。");
                 return;
             }
 
             App.ShowLiteWindow(atCursor: true);
-            App.FlintLiteWindow?.TrySetSearchTextBoxText(text);
+            App.FlintLiteWindow?.ShowCapturedText(text, autoTranslate);
         }
 
         /// <summary>
@@ -236,7 +271,7 @@ namespace Flint3.ViewModels
         {
             App.ShowLiteWindow(atCursor: true);
             App.FlintLiteWindow?.TryClearSearchTextBox();
-            SearchHint = hint;
+            LiteSearchHint = hint;
             if (App.FlintLiteWindow is not null)
             {
                 App.FlintLiteWindow.Height = 386;
@@ -259,6 +294,8 @@ namespace Flint3.ViewModels
                         _selectionSettings.Hotkey ??= new SelectionTranslationSettings().Hotkey;
                         OnPropertyChanged(nameof(SelectionTranslationEnabled));
                         OnPropertyChanged(nameof(SelectionShortcut));
+                        OnPropertyChanged(nameof(SelectionAutoEnabled));
+                        OnPropertyChanged(nameof(SelectionAutoTranslate));
                         return;
                     }
                 }

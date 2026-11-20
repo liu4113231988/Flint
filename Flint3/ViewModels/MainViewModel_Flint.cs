@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flint3.Core.Query;
@@ -70,6 +71,14 @@ namespace Flint3.ViewModels
             private set => SetProperty(ref _searchHint, value);
         }
 
+        private string _liteSearchHint = string.Empty;
+
+        public string LiteSearchHint
+        {
+            get => _liteSearchHint;
+            private set => SetProperty(ref _liteSearchHint, value);
+        }
+
         /// <summary>
         /// 进行对单词搜索相关的初始化
         /// </summary>
@@ -88,8 +97,11 @@ namespace Flint3.ViewModels
         {
             ObservableCollection<StarDictWordItem> wordsCollection = searchingFromMain ? this.SearchResultWordItems : this.LiteSearchResultWordItems;
             SearchRequest request = _searchCoordinator.BeginRequest();
-            SearchHint = string.Empty;
-            UpdateSentenceState(word);
+            SetSearchHint(wordsCollection, string.Empty);
+            if (searchingFromMain)
+            {
+                UpdateSentenceState(word);
+            }
 
             if (string.IsNullOrWhiteSpace(word))
             {
@@ -112,7 +124,39 @@ namespace Flint3.ViewModels
         /// </summary>
         private static bool IsPatternInput(string input)
         {
-            return input.IndexOfAny(['?', '*', '_', '^', '$']) >= 0;
+            return input.IndexOfAny(['?', '*', '_', '^', '$']) >= 0
+                && WordPattern.TryTranslate(input, out _);
+        }
+
+        internal async Task<bool> PreviewCapturedTextAsync(string text, bool autoTranslate)
+        {
+            SearchRequest request = _searchCoordinator.BeginRequest();
+            LiteSearchResultWordItems.Clear();
+            LiteSearchHint = string.Empty;
+
+            try
+            {
+                // 先查完整词组，保留词条中的空格和标点。
+                IReadOnlyList<WordEntry> entries = await _wordQueryService.QueryAsync(text, request.Token);
+                bool isSentence = IsSentenceInput(text);
+                if (entries.Count == 0 && !isSentence)
+                {
+                    string word = WordSearchRegex().Replace(text, "");
+                    entries = await _wordQueryService.MatchAsync(word, 10, request.Token);
+                    if (!ChineseTermExtractor.TryNormalizeQuery(word, out _))
+                    {
+                        entries = entries.Where(entry => entry.Word.StartsWith(word, StringComparison.OrdinalIgnoreCase)).ToArray();
+                    }
+                }
+
+                request.Token.ThrowIfCancellationRequested();
+                PublishResults(LiteSearchResultWordItems, entries, request.Sequence,
+                    entries.Count == 0 ? "本地词典未找到释义" : string.Empty);
+                return autoTranslate && isSentence && entries.Count == 0;
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+            return false;
         }
 
         private async Task SearchPatternAsync(string pattern, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request)
@@ -163,7 +207,7 @@ namespace Flint3.ViewModels
                     wordsCollection.Add(MakeupWordItem(entry));
                 }
 
-                SearchHint = hint;
+                SetSearchHint(wordsCollection, hint);
             }
 
             if (this.Dispatcher is null)
@@ -173,6 +217,18 @@ namespace Flint3.ViewModels
             }
 
             this.Dispatcher.TryEnqueue(Apply);
+        }
+
+        private void SetSearchHint(ObservableCollection<StarDictWordItem> wordsCollection, string hint)
+        {
+            if (ReferenceEquals(wordsCollection, LiteSearchResultWordItems))
+            {
+                LiteSearchHint = hint;
+            }
+            else
+            {
+                SearchHint = hint;
+            }
         }
 
         /// <summary>

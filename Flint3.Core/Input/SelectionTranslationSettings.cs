@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Flint3.Core.Input
 {
     /// <summary>
-    /// 划词翻译设置：开关 + 取词热键 + 自动划词开关，整体 JSON 持久化
+    /// 划词热键、自动取词与自动发送设置。
     /// </summary>
     public class SelectionTranslationSettings
     {
@@ -21,5 +21,8 @@ namespace Flint3.Core.Input
         /// </summary>
         [JsonPropertyName("autoEnabled")]
         public bool AutoEnabled { get; set; } = false;
+
+        [JsonPropertyName("autoTranslate")]
+        public bool AutoTranslate { get; set; }
     }
 }

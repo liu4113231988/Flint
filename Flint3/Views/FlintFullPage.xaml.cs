@@ -1,5 +1,6 @@
 using System;
 using Flint3.Controls;
+using Flint3.Core.Translation;
 using Flint3.Data.Models;
 using Flint3.ViewModels;
 using Microsoft.UI.Xaml;
@@ -206,6 +207,11 @@ namespace Flint3.Views
         /// </summary>
         private void OnClickModeAi(object sender, RoutedEventArgs e)
         {
+            ShowAiPanel();
+        }
+
+        private void ShowAiPanel()
+        {
             ViewModel.EnterAiTranslationMode();
             UpdateModeButtons();
             AiPanelInputBox?.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
@@ -223,6 +229,17 @@ namespace Flint3.Views
         private void OnClickAiPanelTranslate(object sender, RoutedEventArgs e)
         {
             ViewModel.TranslatePanel(AiPanelInputBox?.Text);
+        }
+
+        internal void TranslateText(string text)
+        {
+            AiPanelInputBox.Text = text;
+            ViewModel.PanelSourceIndex = (int)TranslationLanguage.Auto;
+            ViewModel.PanelTargetIndex = TranslationDirectionDetector.Detect(text) == TranslationDirection.ZhToEn
+                ? (int)TranslationLanguage.En - 1
+                : (int)TranslationLanguage.Zh - 1;
+            ShowAiPanel();
+            ViewModel.TranslatePanel(text);
         }
 
         /// <summary>
