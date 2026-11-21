@@ -12,8 +12,9 @@
         <Nullable>enable</Nullable>
         <UseWinUI>true</UseWinUI>
         <DefaultLanguage>zh-CN</DefaultLanguage>
-        <!-- 免打包时界面版本号回退到程序集版本，与 Package.appxmanifest 的 Identity 保持一致 -->
-        <Version>3.5.0</Version>
+        <!-- 免打包时界面版本号来自程序集版本。 -->
+        <Version>3.5.1</Version>
+        <IncludeDictionaryData Condition="'$(IncludeDictionaryData)' == ''">true</IncludeDictionaryData>
         <CsWinRTAotOptimizerEnabled>true</CsWinRTAotOptimizerEnabled>
         <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
         <SupportedOSPlatformVersion>10.0.22000.0</SupportedOSPlatformVersion>
@@ -84,8 +85,8 @@
         <None Remove="Views\GlossaryPropertyPage.xaml" />
         <None Remove="Views\SettingsPage.xaml" />
     </ItemGroup>
-    <ItemGroup>
-        <Content Include="Data\stardict.db">
+    <ItemGroup Condition="'$(IncludeDictionaryData)' == 'true'">
+        <Content Include="Data\stardict.db" Condition="Exists('Data\stardict.db')">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
         <!-- CSF 优先于 stardict.db 被运行时选用；文件未生成时跳过，构建仍可继续（回退 SQLite） -->
@@ -97,6 +98,8 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
         </Content>
+    </ItemGroup>
+    <ItemGroup>
         <!-- WinUI 默认只把 Assets 交给 AppX 打包流程，免打包发布需要显式标记，否则运行时读不到图标等资源 -->
         <Content Update="Assets\**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
