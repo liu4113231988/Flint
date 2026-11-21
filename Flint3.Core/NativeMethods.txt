@@ -19,6 +19,7 @@ UnhookWindowsHookEx
 VIRTUAL_KEY
 WINDOWS_HOOK_ID
 GetForegroundWindow
+GetDoubleClickTime
 GetWindowThreadProcessId
 GetDC
 ReleaseDC

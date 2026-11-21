@@ -1,4 +1,6 @@
 using System;
+using System.Drawing;
+using Windows.Win32;
 
 namespace Flint3.Core.Input
 {
@@ -9,7 +11,7 @@ namespace Flint3.Core.Input
     public sealed class AutoSelectionMonitor : IDisposable
     {
         private readonly MouseHook _hook;
-        private readonly SelectionGestureDetector _detector = new();
+        private readonly SelectionGestureDetector _detector = new(Flint3CorePInvoke.GetDoubleClickTime());
 
         public AutoSelectionMonitor()
         {
@@ -17,9 +19,11 @@ namespace Flint3.Core.Input
         }
 
         /// <summary>
-        /// 检测到一次选词手势（左键拖动后抬起）；在钩子线程触发
+        /// 检测到拖选或双击选词；坐标为手势结束时的屏幕像素。
         /// </summary>
-        public event Action? SelectionGesture;
+        public event Action<Point>? SelectionGesture;
+
+        public event Action<Point>? PointerPressed;
 
         public bool IsInstalled => _hook.IsInstalled;
 
@@ -35,9 +39,14 @@ namespace Flint3.Core.Input
                 return;
             }
 
-            if (_detector.Process(ev.Message, ev.X, ev.Y))
+            if (ev.Message is 0x0201 or 0x0204 or 0x0207 or 0x020A or 0x020E)
             {
-                SelectionGesture?.Invoke();
+                PointerPressed?.Invoke(new Point(ev.X, ev.Y));
+            }
+
+            if (_detector.Process(ev.Message, ev.X, ev.Y, Environment.TickCount64))
+            {
+                SelectionGesture?.Invoke(new Point(ev.X, ev.Y));
             }
         }
 

@@ -23,6 +23,7 @@
 - [x] 单词模式匹配（`?` / `_` 单字母、`*` 任意长度、`^` / `$` 锚定）与内置 Wordle
 - [x] 汉英反查：输入中文精确或前缀匹配英文词，旁挂索引缺失/损坏时自动降级且不影响英文查词
 - [x] 免打包下的开机自启（写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）与界面版本号
+- [x] 划词图标、划词快捷键、屏幕 OCR 与 AI 翻译，见[划词与屏幕取词说明](docs/selection-icon.md)
 
 #### 已知限制
 
@@ -47,11 +48,11 @@
 
 #### 构建、测试与数据准备
 
-见 [docs/build.md](docs/build.md)。仓库分发的词典数据为 `stardict.csf` 分卷（约 121 MB）与中文反查索引 `stardict.zhx.7z`（31.83 MB，约增加 26% 的 clone 体积），执行 `prepare-data.ps1` 后会解压到 `Flint3/Data` 并校验 SHA256。简要命令：
+见 [docs/build.md](docs/build.md)。仓库分发的词典数据为 `stardict.csf` 分卷（约 121 MB）与中文反查索引 `stardict.zhx.7z`（31.83 MB，约增加 26% 的 clone 体积），执行 `prepare-data.ps1` 后会解压到 `Flint3/Data` 并校验 SHA256。在 Visual Studio Developer PowerShell 中运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/prepare-data.ps1
-dotnet build Flint.sln -c Debug -p:Platform=x64
+msbuild Flint.sln /t:Build /p:Configuration=Debug /p:Platform=x64
 dotnet test tests\Flint3.Core.Tests\Flint3.Core.Tests.csproj
 dotnet test tests\Flint3.Data.Tests\Flint3.Data.Tests.csproj
 dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj

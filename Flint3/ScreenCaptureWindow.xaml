@@ -7,19 +7,29 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    Title="Flint" Width="800" Height="600" mc:Ignorable="d">
+    Title="Flint" Width="800" Height="600" mc:Ignorable="d" Activated="OnActivated">
 
-    <local:CrosshairGrid x:Name="RootGrid" Background="Black" IsTabStop="True"
-          PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved"
-          PointerReleased="OnPointerReleased" PointerCanceled="OnPointerCanceled"
-          PointerCaptureLost="OnPointerCaptureLost" KeyDown="OnKeyDown">
-        <Image x:Name="ScreenshotImage" Stretch="Fill" IsHitTestVisible="False"/>
-        <Border x:Name="SelectionBorder" Visibility="Collapsed" IsHitTestVisible="False"
-                HorizontalAlignment="Left" VerticalAlignment="Top"
-                BorderThickness="1.5" BorderBrush="{ThemeResource SystemAccentColor}" Background="#220078D7"/>
-        <Border Background="#99000000" CornerRadius="6" Padding="14,7" IsHitTestVisible="False"
+    <local:CrosshairGrid x:Name="RootGrid" Loaded="OnRootLoaded">
+        <UIElement.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Escape" Invoked="OnCancelInvoked"/>
+        </UIElement.KeyboardAccelerators>
+        <Grid x:Name="CaptureSurface" Background="Black"
+              PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved"
+              PointerReleased="OnPointerReleased" PointerCanceled="OnPointerCanceled"
+              PointerCaptureLost="OnPointerCaptureLost">
+            <Image x:Name="ScreenshotImage" Stretch="Fill" IsHitTestVisible="False"/>
+            <Border x:Name="SelectionBorder" Visibility="Collapsed" IsHitTestVisible="False"
+                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                    BorderThickness="1.5" BorderBrush="{ThemeResource SystemAccentColor}" Background="#220078D7"/>
+        </Grid>
+        <Border Background="#CC000000" CornerRadius="6" Padding="14,5"
                 HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0">
-            <TextBlock Text="拖选区域取词 · 单击文字查词 · Esc 取消" Foreground="White" FontSize="13"/>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock x:Name="InstructionText" Text="拖选区域取词 · 单击文字查词"
+                           Foreground="White" FontSize="13" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+                <Button x:Name="CancelButton" Content="取消" Click="OnClickCancel"
+                        ToolTipService.ToolTip="Esc" RequestedTheme="Dark"/>
+            </StackPanel>
         </Border>
     </local:CrosshairGrid>
 </windowex:WindowEx>

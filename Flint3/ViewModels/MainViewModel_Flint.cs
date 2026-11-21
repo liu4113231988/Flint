@@ -27,6 +27,7 @@ namespace Flint3.ViewModels
         private WordQueryService _wordQueryService;
 
         private readonly SearchCoordinator _searchCoordinator = new();
+        private readonly SearchCoordinator _liteSearchCoordinator = new();
 
         /// <summary>
         /// mdx 词库的导入、删除与启用开关都由设置页经此访问
@@ -38,6 +39,8 @@ namespace Flint3.ViewModels
         /// </summary>
         public void RefreshDictionarySources()
         {
+            _searchCoordinator.Cancel();
+            _liteSearchCoordinator.Cancel();
             WordQueryService previous = _wordQueryService;
             _wordQueryService = CreateQueryService();
             previous.Dispose();
@@ -96,7 +99,7 @@ namespace Flint3.ViewModels
         public void MatchWord(string word, bool searchingFromMain, int limit = 10)
         {
             ObservableCollection<StarDictWordItem> wordsCollection = searchingFromMain ? this.SearchResultWordItems : this.LiteSearchResultWordItems;
-            SearchRequest request = _searchCoordinator.BeginRequest();
+            SearchRequest request = (searchingFromMain ? _searchCoordinator : _liteSearchCoordinator).BeginRequest();
             SetSearchHint(wordsCollection, string.Empty);
             if (searchingFromMain)
             {
@@ -128,9 +131,11 @@ namespace Flint3.ViewModels
                 && WordPattern.TryTranslate(input, out _);
         }
 
-        internal async Task<bool> PreviewCapturedTextAsync(string text, bool autoTranslate)
+        internal void CancelLiteSearch() => _liteSearchCoordinator.Cancel();
+
+        internal async Task<bool> PreviewCapturedTextAsync(string text)
         {
-            SearchRequest request = _searchCoordinator.BeginRequest();
+            SearchRequest request = _liteSearchCoordinator.BeginRequest();
             LiteSearchResultWordItems.Clear();
             LiteSearchHint = string.Empty;
 
@@ -152,7 +157,7 @@ namespace Flint3.ViewModels
                 request.Token.ThrowIfCancellationRequested();
                 PublishResults(LiteSearchResultWordItems, entries, request.Sequence,
                     entries.Count == 0 ? "本地词典未找到释义" : string.Empty);
-                return autoTranslate && isSentence && entries.Count == 0;
+                return entries.Count == 0;
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
@@ -196,7 +201,10 @@ namespace Flint3.ViewModels
         {
             void Apply()
             {
-                if (!_searchCoordinator.IsCurrent(sequence))
+                SearchCoordinator coordinator = ReferenceEquals(wordsCollection, LiteSearchResultWordItems)
+                    ? _liteSearchCoordinator
+                    : _searchCoordinator;
+                if (!coordinator.IsCurrent(sequence))
                 {
                     return;
                 }
@@ -210,7 +218,7 @@ namespace Flint3.ViewModels
                 SetSearchHint(wordsCollection, hint);
             }
 
-            if (this.Dispatcher is null)
+            if (this.Dispatcher is null || this.Dispatcher.HasThreadAccess)
             {
                 Apply();
                 return;

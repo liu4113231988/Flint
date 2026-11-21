@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 using Flint3.Core.Capture;
 using Windows.Graphics.Imaging;
@@ -25,44 +27,51 @@ namespace Flint3.Helpers
     public static class OcrService
     {
         /// <summary>
-        /// 系统是否装有可用的 OCR 语言包
+        /// 首选系统首选语言。首选语言不匹配时使用已安装的识别语言。
         /// </summary>
-        public static bool IsLanguageAvailable => OcrEngine.AvailableRecognizerLanguages.Count > 0;
+        internal static OcrEngine? CreateEngine()
+        {
+            OcrEngine? preferred = OcrEngine.TryCreateFromUserProfileLanguages();
+            if (preferred is not null)
+            {
+                return preferred;
+            }
+
+            foreach (var language in OcrEngine.AvailableRecognizerLanguages)
+            {
+                OcrEngine? engine = OcrEngine.TryCreateFromLanguage(language);
+                if (engine is not null)
+                {
+                    return engine;
+                }
+            }
+
+            return null;
+        }
 
         /// <summary>
-        /// 识别截图中的文字；无语言包或识别失败返回 null。
+        /// 识别截图中的文字。
         /// 超过引擎尺寸上限时缩小；小字未识别时放大重试。词坐标换算回原图像素。
         /// </summary>
-        public static async Task<OcrCaptureResult?> RecognizeAsync(ScreenCaptureResult capture)
+        internal static Task<OcrCaptureResult> RecognizeAsync(
+            OcrEngine engine, ScreenCaptureResult capture, CancellationToken cancellationToken)
         {
-            ArgumentNullException.ThrowIfNull(capture);
-
-            try
+            return Task.Run(async () =>
             {
-                OcrEngine? engine = OcrEngine.TryCreateFromUserProfileLanguages();
-                if (engine is null)
-                {
-                    return null;
-                }
-
                 uint max = OcrEngine.MaxImageDimension;
                 double maxScale = (double)max / Math.Max(capture.Width, capture.Height);
-                OcrCaptureResult result = await RecognizeAtScaleAsync(engine, capture, Math.Min(1, maxScale));
+                OcrCaptureResult result = await RecognizeAtScaleAsync(engine, capture, Math.Min(1, maxScale), cancellationToken);
 
                 return result.Words.Count == 0 && maxScale > 1
-                    ? await RecognizeAtScaleAsync(engine, capture, Math.Min(2, maxScale))
+                    ? await RecognizeAtScaleAsync(engine, capture, Math.Min(2, maxScale), cancellationToken)
                     : result;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.WriteLine(ex);
-                return null;
-            }
+            }, cancellationToken);
         }
 
         private static async Task<OcrCaptureResult> RecognizeAtScaleAsync(
-            OcrEngine engine, ScreenCaptureResult capture, double scale)
+            OcrEngine engine, ScreenCaptureResult capture, double scale, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             SoftwareBitmap bitmap;
             if (scale == 1)
             {
@@ -73,7 +82,8 @@ namespace Flint3.Helpers
             else
             {
                 using var stream = new MemoryStream(ScreenCaptureService.EncodeBmp(capture));
-                var decoder = await BitmapDecoder.CreateAsync(stream.AsRandomAccessStream());
+                using var bitmapStream = stream.AsRandomAccessStream();
+                var decoder = await BitmapDecoder.CreateAsync(bitmapStream).AsTask(cancellationToken);
                 bitmap = await decoder.GetSoftwareBitmapAsync(
                     BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore,
                     new BitmapTransform
@@ -82,14 +92,16 @@ namespace Flint3.Helpers
                         ScaledHeight = Math.Max(1, (uint)(capture.Height * scale)),
                         InterpolationMode = scale > 1 ? BitmapInterpolationMode.Cubic : BitmapInterpolationMode.Fant
                     },
-                    ExifOrientationMode.IgnoreExifOrientation, ColorManagementMode.DoNotColorManage);
+                    ExifOrientationMode.IgnoreExifOrientation, ColorManagementMode.DoNotColorManage).AsTask(cancellationToken);
             }
 
             using (bitmap)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 double scaleX = (double)bitmap.PixelWidth / capture.Width;
                 double scaleY = (double)bitmap.PixelHeight / capture.Height;
-                OcrResult result = await engine.RecognizeAsync(bitmap);
+                OcrResult result = await engine.RecognizeAsync(bitmap).AsTask(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 var words = new List<CapturedWord>();
                 foreach (OcrLine line in result.Lines)
                 {
@@ -102,7 +114,7 @@ namespace Flint3.Helpers
                     }
                 }
 
-                return new OcrCaptureResult { Text = result.Text, Words = words };
+                return new OcrCaptureResult { Text = string.Join("\n", result.Lines.Select(line => line.Text)), Words = words };
             }
         }
     }

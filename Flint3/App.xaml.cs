@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Threading.Tasks;
+using Flint3.Core.Capture;
 using Flint3.Data;
 using Flint3.Helpers;
 using Flint3.ViewModels;
@@ -9,6 +10,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Dwm;
 using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.WindowsAndMessaging;
 using WinUIEx;
@@ -130,7 +132,7 @@ namespace Flint3
                     }
                 };
 
-                // 右键菜单"自动划词"勾选开关（菜单在 UI 线程弹出，直接切换即可）
+                // 托盘菜单与设置页共用划词图标开关。
                 NotifyIcon.AutoSelectionStateProvider = () => MainViewModel.Instance.SelectionAutoEnabled;
                 NotifyIcon.OnClickToggleAutoSelection += () =>
                 {
@@ -150,7 +152,9 @@ namespace Flint3
         /// </summary>
         public static void HideApp()
         {
-            FlintLiteWindow?.Hide();
+            ScreenCaptureWindow.CancelCurrent();
+            MainViewModel.Instance.DismissSelectionIcon();
+            FlintLiteWindow?.Dismiss();
             FlintMainWindow?.Hide();
 
             // 弹出系统通知
@@ -186,7 +190,9 @@ namespace Flint3
         /// </summary>
         public static void ShowMainWindow()
         {
-            FlintLiteWindow?.Hide();
+            ScreenCaptureWindow.CancelCurrent();
+            MainViewModel.Instance.DismissSelectionIcon();
+            FlintLiteWindow?.Dismiss();
 
             FlintMainWindow ??= new MainWindow();
 
@@ -212,11 +218,14 @@ namespace Flint3
         /// <summary>
         /// 弹出燧石简洁窗口；atCursor 为 true 时贴近鼠标位置（划词翻译），否则在显示器上方居中
         /// </summary>
-        public static void ShowLiteWindow(bool atCursor = false)
+        public static void ShowLiteWindow(bool atCursor = false, Point? anchor = null)
         {
+            ScreenCaptureWindow.CancelCurrent();
+            MainViewModel.Instance.DismissSelectionIcon();
             FlintMainWindow?.Hide();
 
             FlintLiteWindow ??= new LiteWindow();
+            FlintLiteWindow.IsShownInSwitchers = atCursor;
 
             if (MainViewModel.Instance.AppSettings.AutoClearLastInput)
             {
@@ -224,73 +233,74 @@ namespace Flint3
                 FlintLiteWindow.TryClearSearchTextBox();
             }
 
-            // 更新窗口位置
+            Point pointer = anchor.GetValueOrDefault();
+            if ((anchor.HasValue || PInvoke.GetCursorPos(out pointer)) && TryGetPointerWorkArea(pointer, out Rectangle workArea, out uint dpi))
             {
-                bool searchEmpty = string.IsNullOrWhiteSpace(FlintLiteWindow.TryGetSearchTextBoxContent());
-
-                // 获取鼠标当前所在的显示器
-                PInvoke.GetCursorPos(out Point pt);
-                var hwndDesktop = PInvoke.MonitorFromPoint(pt, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
-
-                // 获取当前激活窗口所在的显示器
-                //IntPtr focusedWindow = PInvoke.GetForegroundWindow();
-                //var hwndDesktop = PInvoke.MonitorFromWindow(new(focusedWindow), MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
-
-                MONITORINFO info = new MONITORINFO();
-                info.cbSize = 40;
-                PInvoke.GetMonitorInfo(hwndDesktop, ref info);
-                int width = 540;
-                int height = searchEmpty && !atCursor ? 64 : 386;
-
-                PInvoke.GetDpiForMonitor(hwndDesktop, Windows.Win32.UI.HiDpi.MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out uint dpiX, out uint dpiY);
-                var scalingFactor = dpiX / 96d;
-
-                //var dpi = PInvoke.GetDpiForWindow(new HWND(focusedWindow));
-                //var scalingFactor = dpi / 96d;
-
-                var w = (int)(width * scalingFactor);
-                var h = (int)(height * scalingFactor);
-                int left, top;
-                if (atCursor)
-                {
-                    // 光标右下方弹出，超出工作区时翻转到另一侧
-                    left = pt.X + 16;
-                    top = pt.Y + 16;
-                    if (left + w > info.rcWork.right)
-                    {
-                        left = Math.Max(info.rcWork.left, pt.X - w - 16);
-                    }
-
-                    if (top + h > info.rcWork.bottom)
-                    {
-                        top = Math.Max(info.rcWork.top, pt.Y - h - 16);
-                    }
-                }
-                else
-                {
-                    var cx = (info.rcMonitor.left + info.rcMonitor.right) / 2;
-                    var cy = (info.rcMonitor.bottom + info.rcMonitor.top) / 4;
-                    left = cx - (w / 2);
-                    top = cy;
-                }
-
-                IntPtr hwnd = FlintLiteWindow.GetWindowHandle();
-                bool result = PInvoke.SetWindowPos(new HWND(hwnd), new HWND(), left, top, w, h, (SET_WINDOW_POS_FLAGS)0);
-                //if (!result)
-                //{
-                //    Marshal.ThrowExceptionForHR(Marshal.GetLastWin32Error());
-                //}
+                bool expanded = atCursor || !string.IsNullOrWhiteSpace(FlintLiteWindow.TryGetSearchTextBoxContent());
+                SetLiteWindowBounds(new HWND(FlintLiteWindow.GetWindowHandle()),
+                    LiteWindowPlacement.Place(workArea, dpi, expanded, atCursor ? pointer : null));
             }
 
-            FlintLiteWindow.Restore();
-            FlintLiteWindow.BringToFront();
-            FlintLiteWindow.Activate();
-
-            if (MainViewModel.Instance.AppSettings.AutoClearLastInput)
+            if (atCursor)
             {
-                MainViewModel.Instance.LiteSearchResultWordItems.Clear();
-                FlintLiteWindow.TryClearSearchTextBox();
+                FlintLiteWindow.AppWindow.Show(activateWindow: false);
             }
+            else
+            {
+                FlintLiteWindow.Restore();
+                FlintLiteWindow.BringToFront();
+                FlintLiteWindow.Activate();
+            }
+        }
+
+        internal static bool TryGetPointerWorkArea(Point pointer, out Rectangle workArea, out uint dpi)
+        {
+            var monitor = PInvoke.MonitorFromPoint(pointer, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
+            if (PInvoke.GetDpiForMonitor(monitor, Windows.Win32.UI.HiDpi.MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out dpi, out _).Failed)
+            {
+                dpi = 0;
+            }
+
+            return TryGetWorkArea(monitor, out workArea);
+        }
+
+        internal static unsafe void DisablePopupTransitions(IntPtr handle)
+        {
+            // 立即从桌面移除浮窗，避免屏幕取词截到淡出的窗口。
+            int disabled = 1;
+            PInvoke.DwmSetWindowAttribute(new HWND(handle), DWMWINDOWATTRIBUTE.DWMWA_TRANSITIONS_FORCEDISABLED,
+                &disabled, sizeof(int));
+        }
+
+        internal static void ResizeLiteWindow(bool expanded)
+        {
+            if (FlintLiteWindow is not LiteWindow window)
+            {
+                return;
+            }
+
+            HWND hwnd = new HWND(window.GetWindowHandle());
+            var monitor = PInvoke.MonitorFromWindow(hwnd, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
+            if (TryGetWorkArea(monitor, out Rectangle workArea))
+            {
+                var position = window.AppWindow.Position;
+                SetLiteWindowBounds(hwnd, LiteWindowPlacement.Resize(workArea, PInvoke.GetDpiForWindow(hwnd),
+                    expanded, new Point(position.X, position.Y)));
+            }
+        }
+
+        private static bool TryGetWorkArea(HMONITOR monitor, out Rectangle workArea)
+        {
+            MONITORINFO info = new() { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
+            bool success = PInvoke.GetMonitorInfo(monitor, ref info);
+            workArea = Rectangle.FromLTRB(info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom);
+            return success && workArea.Width > 0 && workArea.Height > 0;
+        }
+
+        private static void SetLiteWindowBounds(HWND hwnd, Rectangle bounds)
+        {
+            PInvoke.SetWindowPos(hwnd, default, bounds.X, bounds.Y, bounds.Width, bounds.Height,
+                SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER);
         }
 
     }

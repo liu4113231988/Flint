@@ -178,7 +178,9 @@ namespace Flint3.ViewModels
                     DisposeAutoSelectionMonitor();
                     _wordQueryService?.Dispose();
                     _searchCoordinator.Dispose();
+                    _liteSearchCoordinator.Dispose();
                     _translationCoordinator.Dispose();
+                    _liteTranslationCoordinator.Dispose();
                     _disposed = true;
                 }
             }

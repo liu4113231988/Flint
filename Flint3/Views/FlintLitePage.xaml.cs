@@ -26,21 +26,6 @@ namespace Flint3.Views
             ViewModel = MainViewModel.Instance;
             this.InitializeComponent();
 
-            //ViewModel.LiteSearchResultWordItems.CollectionChanged += (_, e) =>
-            //{
-            //    try
-            //    {
-            //        App.FlintLiteWindow.Height = (e.NewItems != null && e.NewItems.Count > 0) ? 386 : 64;
-            //    }
-            //    catch { }
-            //};
-        }
-
-        private void FlintLiteViewPage_Loaded(object sender, RoutedEventArgs e)
-        {
-            App.FlintLiteWindow.Height = string.IsNullOrWhiteSpace(SearchTextBox?.Text) ? 64 : 386;
-            App.FlintLiteWindow.Activate();
-            App.FlintLiteWindow.TryFocusOnSearchTextBox();
         }
 
         /// <summary>
@@ -50,42 +35,69 @@ namespace Flint3.Views
         /// <param name="e"></param>
         private void SearchTextBox_TextChanging(TextBox sender, TextBoxTextChangingEventArgs e)
         {
-            _capturedText = null;
-            CancelAutomaticTranslation();
             bool hasText = !string.IsNullOrWhiteSpace(sender.Text);
             TranslateOriginalButton.IsEnabled = hasText;
-            App.FlintLiteWindow.Height = hasText ? 386 : 64;
+            if (_settingCapturedText)
+            {
+                return;
+            }
+
+            _capturedText = null;
+            CancelPendingTranslation();
+            App.ResizeLiteWindow(expanded: hasText);
             ViewModel.MatchWord(sender.Text, false);
         }
 
         private string? _capturedText;
         private int _captureVersion;
+        private bool _settingCapturedText;
 
-        internal void CancelAutomaticTranslation() => _captureVersion++;
+        internal void CancelPendingTranslation()
+        {
+            _captureVersion++;
+            ViewModel.ClearLiteTranslation();
+        }
 
         internal void ClearInput()
         {
-            CancelAutomaticTranslation();
-            _capturedText = null;
-            SearchTextBox.Text = string.Empty;
-        }
-
-        internal async void ShowCapturedText(string text, bool autoTranslate)
-        {
-            SearchTextBox.Text = text.ReplaceLineEndings(" ");
-            _capturedText = text;
-            int version = ++_captureVersion;
-            if (await ViewModel.PreviewCapturedTextAsync(text, autoTranslate)
-                && version == _captureVersion
-                && ViewModel.SelectionAutoEnabled && ViewModel.SelectionAutoTranslate && ViewModel.AppSettings.EnableAiTranslation)
+            if (SearchTextBox.Text.Length == 0)
             {
-                TranslateInMainWindow(text);
+                CancelPendingTranslation();
+                ViewModel.MatchWord(string.Empty, false);
+            }
+            else
+            {
+                SearchTextBox.Text = string.Empty;
             }
         }
 
-        private void OnClickTranslateOriginal(object sender, RoutedEventArgs e)
+        internal async void ShowCapturedText(string text, bool translateOnMiss)
         {
-            TranslateInMainWindow(_capturedText ?? SearchTextBox.Text);
+            _settingCapturedText = true;
+            try
+            {
+                SearchTextBox.Text = text.ReplaceLineEndings(" ");
+            }
+            finally
+            {
+                _settingCapturedText = false;
+            }
+
+            _capturedText = text;
+            CancelPendingTranslation();
+            int version = _captureVersion;
+            if (await ViewModel.PreviewCapturedTextAsync(text)
+                && version == _captureVersion
+                && translateOnMiss && ViewModel.AppSettings.EnableAiTranslation)
+            {
+                await ViewModel.TranslateLiteTextAsync(text);
+            }
+        }
+
+        private async void OnClickTranslateOriginal(object sender, RoutedEventArgs e)
+        {
+            _captureVersion++;
+            await ViewModel.TranslateLiteTextAsync(_capturedText ?? SearchTextBox.Text);
         }
 
         private static void TranslateInMainWindow(string text)
@@ -107,11 +119,11 @@ namespace Flint3.Views
             App.ShowMainWindow();
         }
 
-        /// <summary>
-        /// 添加单词到生词本
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
+        private void OnClickClosePreview(object sender, RoutedEventArgs e)
+        {
+            App.FlintLiteWindow?.Dismiss();
+        }
+
         /// <summary>
         /// 在主窗中 AI 翻译该词条：打开主窗、回填搜索框并直接发起翻译
         /// </summary>

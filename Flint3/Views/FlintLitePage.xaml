@@ -11,7 +11,7 @@
     xmlns:cvt="using:Flint3.Converters" 
     xmlns:mdl="using:Flint3.Data.Models" 
     xmlns:controls="using:Flint3.Controls"
-    Background="Transparent" NavigationCacheMode="Required" Loaded="FlintLiteViewPage_Loaded">
+    Background="Transparent" NavigationCacheMode="Required">
 
     <Page.Resources>
         <cvt:Int2VisibilityConverter x:Key="Int2Vis"/>
@@ -26,6 +26,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -33,6 +34,7 @@
         <Grid Grid.Row="0" Height="Auto">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
@@ -50,14 +52,38 @@
                     </Image.Source>
                 </Image>
             </Button>
+            <Button Grid.Column="3" Click="OnClickClosePreview" AutomationProperties.Name="关闭简洁窗" ToolTipService.ToolTip="关闭简洁窗"
+                    VerticalAlignment="Center" Height="40" Width="40" Margin="0,0,8,0" Padding="0" Background="Transparent" BorderBrush="Transparent">
+                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE711;" FontSize="14"/>
+            </Button>
         </Grid>
 
         <!--分割线-->
         <Border Grid.Row="1" Height="1" Background="{ThemeResource ControlElevationBorderBrush}" HorizontalAlignment="Stretch" VerticalAlignment="Top"/>
 
+        <Border Grid.Row="2" Margin="12,8,12,0" Padding="12" CornerRadius="6"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                Visibility="{x:Bind ViewModel.LiteTranslationVisible,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
+            <StackPanel Spacing="6">
+                <ScrollViewer MaxHeight="152" VerticalScrollBarVisibility="Auto"
+                              Visibility="{x:Bind ViewModel.LiteTranslation.ResultText,Mode=OneWay,Converter={StaticResource Null2Vis},FallbackValue=Collapsed}">
+                    <TextBlock Text="{x:Bind ViewModel.LiteTranslation.ResultText,Mode=OneWay}"
+                               TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                </ScrollViewer>
+                <TextBlock Text="{x:Bind ViewModel.LiteTranslation.ErrorText,Mode=OneWay}" TextWrapping="Wrap"
+                           Visibility="{x:Bind ViewModel.LiteTranslation.ErrorText,Mode=OneWay,Converter={StaticResource Null2Vis},FallbackValue=Collapsed}"/>
+                <TextBlock Text="{x:Bind ViewModel.LiteTranslation.DetailText,Mode=OneWay}" Opacity="0.65" FontSize="12" TextWrapping="Wrap"
+                           Visibility="{x:Bind ViewModel.LiteTranslation.DetailText,Mode=OneWay,Converter={StaticResource Null2Vis},FallbackValue=Collapsed}"/>
+                <Button Content="重试" Click="OnClickTranslateOriginal"
+                        Visibility="{x:Bind ViewModel.LiteTranslation.CanRetry,Mode=OneWay,Converter={StaticResource Bool2Vis},FallbackValue=Collapsed}"/>
+            </StackPanel>
+        </Border>
+
         <!--占位图片-->
-        <Grid Grid.Row="2" Visibility="{x:Bind ViewModel.LiteSearchResultWordItems.Count,Mode=OneWay,Converter={StaticResource Int2Vis},ConverterParameter=-}" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+        <Grid Grid.Row="3" Visibility="{x:Bind ViewModel.LiteTranslationVisible,Mode=OneWay,Converter={StaticResource Bool2Vis},ConverterParameter=-}">
+            <StackPanel Visibility="{x:Bind ViewModel.LiteSearchResultWordItems.Count,Mode=OneWay,Converter={StaticResource Int2Vis},ConverterParameter=-}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
                 <Image Source="/Assets/Logos/flint_logo_gray.png" Height="72" Width="72" Opacity="0.07" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 <TextBlock Text="{x:Bind ViewModel.LiteSearchHint,Mode=OneWay}" Opacity="0.4" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
                            Visibility="{x:Bind ViewModel.LiteSearchHint,Mode=OneWay,Converter={StaticResource Null2Vis}}"/>
@@ -65,7 +91,7 @@
         </Grid>
 
         <!--搜索结果列表-->
-        <Grid Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+        <Grid Grid.Row="3" HorizontalAlignment="Stretch" VerticalAlignment="Top">
             <ListView ItemsSource="{x:Bind ViewModel.LiteSearchResultWordItems,Mode=OneWay}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" Padding="0,8,2,8" HorizontalAlignment="Stretch" SelectionMode="None" IsItemClickEnabled="False" IsSwipeEnabled="False">
                 <ListView.ItemContainerTransitions>
                     <TransitionCollection />
@@ -112,8 +138,8 @@
                                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE109;" FontSize="12" Opacity="0.8"/>
                                         </Button.Content>
                                     </Button>
-                                    <!--在主窗翻译：Lite 窗口不承载长文本，跳转到主窗并直接发起 AI 翻译-->
                                     <Button Grid.Column="3" Padding="0" Height="32" Width="32" Margin="16,0,-8,0" Background="Transparent" BorderBrush="Transparent" ToolTipService.ToolTip="在主窗中 AI 翻译"
+                                            Visibility="{Binding ViewModel.AppSettings.EnableAiTranslation,ElementName=FlintLiteViewPage,Mode=OneWay,Converter={StaticResource Bool2Vis}}"
                                             Click="OnClickTranslateInMainWindow">
                                         <Button.Content>
                                             <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE774;" FontSize="12" Opacity="0.8"/>

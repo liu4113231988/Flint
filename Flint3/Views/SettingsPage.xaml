@@ -298,24 +298,12 @@
                         <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE945;"/>
                     </labs:SettingsCard.HeaderIcon>
                     <labs:SettingsCard.Header>
-                        <TextBlock Text="自动划词"/>
+                        <TextBlock Text="显示划词图标"/>
                     </labs:SettingsCard.Header>
                     <labs:SettingsCard.Description>
-                        <TextBlock Text="选中文字后自动取词查询，无需按快捷键；也可在托盘图标右键菜单快速开关"/>
+                        <TextBlock Text="拖选或双击文字后显示图标。点击图标查词，已开启 AI 时，本地未命中的选区会发送至配置的模型接口。" TextWrapping="Wrap"/>
                     </labs:SettingsCard.Description>
                     <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionAutoEnabled,Mode=TwoWay}"/>
-                </labs:SettingsCard>
-
-                <labs:SettingsCard Margin="16,2,16,0" HorizontalAlignment="Stretch"
-                                   IsEnabled="{x:Bind _viewModel.SelectionAutoEnabled,Mode=OneWay}"
-                                   Visibility="{x:Bind _viewModel.AppSettings.EnableAiTranslation,Mode=OneWay,Converter={StaticResource Bool2Vis}}">
-                    <labs:SettingsCard.Header>
-                        <TextBlock Text="自动划词时发送给 AI"/>
-                    </labs:SettingsCard.Header>
-                    <labs:SettingsCard.Description>
-                        <TextBlock Text="开启后，自动划词中本地未命中的句子会发送至已配置的模型接口。" TextWrapping="Wrap"/>
-                    </labs:SettingsCard.Description>
-                    <ToggleSwitch MinWidth="0" Background="Transparent" IsOn="{x:Bind _viewModel.SelectionAutoTranslate,Mode=TwoWay}"/>
                 </labs:SettingsCard>
 
                 <!--屏幕取词设置-->

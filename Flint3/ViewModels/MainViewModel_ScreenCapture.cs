@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -144,35 +145,50 @@ namespace Flint3.ViewModels
 
         private void StartScreenCapture()
         {
+            DismissSelectionIcon();
             if (ScreenCaptureWindow.IsOpen)
             {
                 ScreenCaptureWindow.CancelCurrent();
                 return;
             }
 
-            if (!OcrService.IsLanguageAvailable)
+            try
             {
-                ShowLiteHint("屏幕取词不可用：未检测到系统 OCR 语言包，请在 设置 → 时间和语言 → 语言和区域 → 可选功能 中添加");
-                return;
-            }
+                var engine = OcrService.CreateEngine();
+                if (engine is null)
+                {
+                    ShowLiteHint("屏幕取词不可用：请在 Windows 设置的语言选项中安装 OCR 语言包。");
+                    return;
+                }
 
-            ScreenCaptureWindow.Show(OnScreenCaptureCompleted);
+                App.FlintLiteWindow?.Dismiss();
+                if (!ScreenCaptureWindow.TryShow(engine, OnScreenCaptureCompleted))
+                {
+                    ShowLiteHint("无法截取当前屏幕。请在要取词的显示器上重试。");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                ScreenCaptureWindow.CancelCurrent();
+                ShowLiteHint("无法启动屏幕取词，请重试。");
+            }
         }
 
-        private void OnScreenCaptureCompleted(string? text, bool cancelled)
+        private void OnScreenCaptureCompleted(ScreenRecognitionResult result, string? text, Point? anchor)
         {
-            if (cancelled)
+            switch (result)
             {
-                return;
+                case ScreenRecognitionResult.Success:
+                    ShowSelectionResult(text, anchor: anchor);
+                    break;
+                case ScreenRecognitionResult.NoText:
+                    ShowLiteHint("未识别到文字。请框选包含文字的区域，或单击文字所在位置。", anchor);
+                    break;
+                case ScreenRecognitionResult.Failed:
+                    ShowLiteHint("屏幕文字识别失败。请重试或缩小选区。", anchor);
+                    break;
             }
-
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                ShowLiteHint("屏幕取词未识别到文字：请拖选包含文字的区域，或单击文字所在位置");
-                return;
-            }
-
-            ShowSelectionResult(text);
         }
 
         #region 屏幕取词设置存取

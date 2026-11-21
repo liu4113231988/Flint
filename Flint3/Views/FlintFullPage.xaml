@@ -229,7 +229,8 @@
                     </StackPanel>
                     <!--输入卡片-->
                     <TextBox x:Name="AiPanelInputBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="110" MaxHeight="260" FontSize="14" Padding="12,10" CornerRadius="4"
-                             PlaceholderText="输入要翻译的句子或段落，中英均可..." ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                             PlaceholderText="输入要翻译的句子或段落，中英均可..." ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             TextChanging="OnAiPanelInputChanging"/>
                     <!--语言方向行：源 → 反转 → 目标 + 翻译按钮-->
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>

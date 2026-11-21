@@ -186,7 +186,7 @@ namespace Flint3.Helpers
                                     IntPtr hMenu = CreatePopupMenu();
                                     AppendMenu(hMenu, MF_STRING, (IntPtr)1, "显示窗口");
                                     bool autoOn = this.AutoSelectionStateProvider?.Invoke() ?? false;
-                                    AppendMenu(hMenu, (uint)(MF_STRING | (autoOn ? MF_CHECKED : MF_UNCHECKED)), (IntPtr)3, "自动划词");
+                                    AppendMenu(hMenu, (uint)(MF_STRING | (autoOn ? MF_CHECKED : MF_UNCHECKED)), (IntPtr)3, "显示划词图标");
                                     AppendMenu(hMenu, MF_SEPARATOR, IntPtr.Zero, null);
                                     AppendMenu(hMenu, MF_STRING, (IntPtr)2, "退出");
                                     SetForegroundWindow(hWnd);

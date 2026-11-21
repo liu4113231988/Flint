@@ -85,5 +85,42 @@ namespace Flint3.Core.Tests
             d.Process(Move, 50, 0);
             Assert.False(d.Process(0x0205, 50, 0)); // RBUTTONUP
         }
+
+        [Theory]
+        [InlineData(104, 200, true)]
+        [InlineData(100, 510, false)]
+        [InlineData(120, 200, false)]
+        public void SecondClickRequiresBothTimeAndProximity(int secondX, long elapsed, bool expected)
+        {
+            var detector = new SelectionGestureDetector(doubleClickTime: 500);
+
+            detector.Process(LDown, 100, 100, 1_000);
+            Assert.False(detector.Process(LUp, 100, 100, 1_010));
+            detector.Process(LDown, secondX, 100, 1_000 + elapsed);
+
+            Assert.Equal(expected, detector.Process(LUp, secondX, 100, 1_010 + elapsed));
+        }
+
+        [Theory]
+        [InlineData(100, 400, 800, true)]
+        [InlineData(400, 600, 700, false)]
+        public void DoubleClickMeasuresTimeBetweenPresses(int firstUp, int secondDown, int secondUp, bool expected)
+        {
+            var detector = new SelectionGestureDetector();
+
+            detector.Process(LDown, 100, 100, 0);
+            Assert.False(detector.Process(LUp, 100, 100, firstUp));
+            detector.Process(LDown, 100, 100, secondDown);
+            Assert.Equal(expected, detector.Process(LUp, 100, 100, secondUp));
+        }
+
+        [Fact]
+        public void ReleaseCanCompleteDragWithoutMoveMessage()
+        {
+            var detector = new SelectionGestureDetector();
+
+            detector.Process(LDown, 100, 100);
+            Assert.True(detector.Process(LUp, 106, 100));
+        }
     }
 }

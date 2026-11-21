@@ -253,6 +253,9 @@ namespace Flint3.Views
         /// <summary>
         /// AI 翻译搜索框中的整句（不进入词条结果列表）
         /// </summary>
+        private void OnAiPanelInputChanging(TextBox sender, TextBoxTextChangingEventArgs args)
+            => ViewModel.ClearPanelTranslation();
+
         private void OnClickTranslateSentence(object sender, RoutedEventArgs e)
         {
             MainViewModel.Instance.TranslateSentence(SearchTextBox?.Text);

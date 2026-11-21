@@ -1,15 +1,18 @@
 using System;
+using System.Drawing;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Flint3.Core.Input;
 using Flint3.Core.Serialization;
 using Flint3.Helpers;
+using Windows.Win32;
+using Windows.Win32.Foundation;
 
 namespace Flint3.ViewModels
 {
     /// <summary>
-    /// 划词取词：在光标旁预览选区并查词，自动发送由独立设置控制。
+    /// 划词取词：快捷键直接查词，鼠标划选后显示图标。
     /// </summary>
     public partial class MainViewModel : ObservableObject
     {
@@ -19,9 +22,8 @@ namespace Flint3.ViewModels
 
         private AutoSelectionMonitor? _autoSelectionMonitor;
 
-        private long _lastAutoCaptureTick;
-
-        private const long AutoCaptureDebounceMs = 800;
+        private SelectionIconWindow? _selectionIcon;
+        private int _selectionVersion;
 
         /// <summary>
         /// 是否启用划词翻译
@@ -63,7 +65,7 @@ namespace Flint3.ViewModels
         }
 
         /// <summary>
-        /// 自动划词：选中文字后自动取词查询，无需按快捷键（默认关闭）
+        /// 选中文字后显示划词图标（默认关闭）
         /// </summary>
         public bool SelectionAutoEnabled
         {
@@ -75,20 +77,6 @@ namespace Flint3.ViewModels
                     _selectionSettings.AutoEnabled = value;
                     OnPropertyChanged();
                     UpdateAutoSelectionMonitor();
-                    _ = SaveSelectionSettings();
-                }
-            }
-        }
-
-        public bool SelectionAutoTranslate
-        {
-            get => _selectionSettings.AutoTranslate;
-            set
-            {
-                if (_selectionSettings.AutoTranslate != value)
-                {
-                    _selectionSettings.AutoTranslate = value;
-                    OnPropertyChanged();
                     _ = SaveSelectionSettings();
                 }
             }
@@ -174,8 +162,15 @@ namespace Flint3.ViewModels
 
         private async Task CaptureAndShowSelectionAsync()
         {
+            DismissSelectionIcon();
+            int version = _selectionVersion;
+            HWND owner = PInvoke.GetForegroundWindow();
+            Point? anchor = PInvoke.GetCursorPos(out Point pointer) ? pointer : null;
             string? text = await SelectionCaptureService.CaptureAsync();
-            this.Dispatcher.TryEnqueue(() => ShowSelectionResult(text));
+            if (SelectionTranslationEnabled && IsCurrentSelection(version, owner))
+            {
+                ShowSelectionResult(text, anchor: anchor);
+            }
         }
 
         /// <summary>
@@ -191,6 +186,7 @@ namespace Flint3.ViewModels
                     {
                         _autoSelectionMonitor = new AutoSelectionMonitor();
                         _autoSelectionMonitor.SelectionGesture += OnAutoSelectionGesture;
+                        _autoSelectionMonitor.PointerPressed += OnSelectionPointerPressed;
                     }
 
                     _autoSelectionMonitor.Start();
@@ -208,74 +204,90 @@ namespace Flint3.ViewModels
 
         private void DisposeAutoSelectionMonitor()
         {
+            DismissSelectionIcon();
             if (_autoSelectionMonitor is not null)
             {
                 _autoSelectionMonitor.SelectionGesture -= OnAutoSelectionGesture;
+                _autoSelectionMonitor.PointerPressed -= OnSelectionPointerPressed;
                 _autoSelectionMonitor.Dispose();
                 _autoSelectionMonitor = null;
             }
         }
 
-        /// <summary>
-        /// 选词手势回调（钩子线程=UI 线程）：防抖后发起取词，不阻塞钩子。
-        /// 前台属本进程时 CaptureAsync 自会跳过，故无需额外判断覆盖窗/简洁窗。
-        /// </summary>
-        private void OnAutoSelectionGesture()
+        private void OnSelectionPointerPressed(Point pointer)
         {
-            long now = Environment.TickCount64;
-            if (now - _lastAutoCaptureTick < AutoCaptureDebounceMs)
+            if (_selectionIcon?.Contains(pointer) != true)
             {
-                return;
-            }
-
-            _lastAutoCaptureTick = now;
-            this.Dispatcher.TryEnqueue(async () => await CaptureAndShowAutoAsync());
-        }
-
-        /// <summary>
-        /// 自动划词取词：取不到文本时静默（区别于热键主动取词的失败提示），避免每次划选都弹窗打扰
-        /// </summary>
-        private async Task CaptureAndShowAutoAsync()
-        {
-            string? text = await SelectionCaptureService.CaptureAsync();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return;
-            }
-
-            this.Dispatcher.TryEnqueue(() =>
-            {
-                if (SelectionAutoEnabled)
+                int version = ++_selectionVersion;
+                if (_selectionIcon is null)
                 {
-                    ShowSelectionResult(text, autoTranslate: SelectionAutoTranslate && AppSettings.EnableAiTranslation);
+                    return;
                 }
-            });
+
+                Dispatcher.TryEnqueue(() =>
+                {
+                    if (version == _selectionVersion)
+                    {
+                        _selectionIcon?.Dismiss();
+                    }
+                });
+            }
         }
 
-        private void ShowSelectionResult(string? text, bool autoTranslate = false)
+        internal void DismissSelectionIcon()
         {
-            if (string.IsNullOrWhiteSpace(text))
+            _selectionVersion++;
+            _selectionIcon?.Dismiss();
+        }
+
+        private void OnAutoSelectionGesture(Point pointer)
+        {
+            int version = _selectionVersion;
+            HWND owner = PInvoke.GetForegroundWindow();
+            Dispatcher.TryEnqueue(async () => await CaptureForIconAsync(pointer, owner, version));
+        }
+
+        private async Task CaptureForIconAsync(Point pointer, HWND owner, int version)
+        {
+            // 鼠标钩子先于目标窗口收到抬键，给目标窗口提交选区的时间。
+            await Task.Delay(50);
+            if (!SelectionAutoEnabled || !IsCurrentSelection(version, owner))
             {
-                ShowLiteHint("未读取到选区。请先选中文字，或使用屏幕取词、手动复制并粘贴。");
                 return;
             }
 
-            App.ShowLiteWindow(atCursor: true);
-            App.FlintLiteWindow?.ShowCapturedText(text, autoTranslate);
+            string? text = await SelectionCaptureService.CaptureAsync();
+            if (!string.IsNullOrWhiteSpace(text) && IsCurrentSelection(version, owner))
+            {
+                _selectionIcon ??= new SelectionIconWindow();
+                _selectionIcon.ShowAt(pointer, owner, () => ShowSelectionResult(text, translateOnMiss: true, anchor: pointer));
+            }
+        }
+
+        private bool IsCurrentSelection(int version, HWND owner)
+            => version == _selectionVersion && owner == PInvoke.GetForegroundWindow();
+
+        private void ShowSelectionResult(string? text, bool translateOnMiss = false, Point? anchor = null)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ShowLiteHint("未读取到选区。请先选中文字，或使用屏幕取词、手动复制并粘贴。", anchor);
+                return;
+            }
+
+            App.ShowLiteWindow(atCursor: true, anchor: anchor);
+            App.FlintLiteWindow?.ShowCapturedText(text, translateOnMiss);
         }
 
         /// <summary>
         /// 在光标旁的简洁窗口显示一条提示（取词失败/不可用）
         /// </summary>
-        private void ShowLiteHint(string hint)
+        private void ShowLiteHint(string hint, Point? anchor = null)
         {
-            App.ShowLiteWindow(atCursor: true);
+            App.ShowLiteWindow(atCursor: true, anchor: anchor);
             App.FlintLiteWindow?.TryClearSearchTextBox();
             LiteSearchHint = hint;
-            if (App.FlintLiteWindow is not null)
-            {
-                App.FlintLiteWindow.Height = 386;
-            }
+            App.ResizeLiteWindow(expanded: true);
         }
 
         #region 划词设置存取
@@ -295,7 +307,6 @@ namespace Flint3.ViewModels
                         OnPropertyChanged(nameof(SelectionTranslationEnabled));
                         OnPropertyChanged(nameof(SelectionShortcut));
                         OnPropertyChanged(nameof(SelectionAutoEnabled));
-                        OnPropertyChanged(nameof(SelectionAutoTranslate));
                         return;
                     }
                 }

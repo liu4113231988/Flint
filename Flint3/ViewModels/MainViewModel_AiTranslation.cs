@@ -19,6 +19,103 @@ namespace Flint3.ViewModels
         private readonly LlmTranslationService _translationService = new();
 
         private readonly SearchCoordinator _translationCoordinator = new();
+        private readonly SearchCoordinator _liteTranslationCoordinator = new();
+        private AiTranslationItem? _activeMainTranslation;
+
+        private AiTranslationItem? _liteTranslation;
+
+        public AiTranslationItem? LiteTranslation
+        {
+            get => _liteTranslation;
+            private set
+            {
+                if (SetProperty(ref _liteTranslation, value))
+                {
+                    OnPropertyChanged(nameof(LiteTranslationVisible));
+                }
+            }
+        }
+
+        public bool LiteTranslationVisible => LiteTranslation is not null;
+
+        internal void ClearLiteTranslation()
+        {
+            _liteTranslationCoordinator.Cancel();
+            LiteTranslation = null;
+        }
+
+        internal async Task TranslateLiteTextAsync(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            AiTranslationItem state = new();
+            LiteTranslation = state;
+            if (BuildAiOptions(out string? configError) is not LlmTranslationOptions options)
+            {
+                _liteTranslationCoordinator.Cancel();
+                ShowTranslationFailure(state, configError ?? "未配置", retryable: false);
+                return;
+            }
+
+            await RunTranslationAsync(state, _liteTranslationCoordinator, options.Model,
+                token => _translationService.TranslateAsync(options, text, TranslationDirection.Auto, token));
+        }
+
+        private async Task RunTranslationAsync(AiTranslationItem state, SearchCoordinator coordinator, string model,
+            Func<CancellationToken, Task<LlmTranslationOutcome>> translate)
+        {
+            SearchRequest request = coordinator.BeginRequest();
+            ShowTranslationRunning(state);
+            LlmTranslationOutcome outcome;
+            try
+            {
+                outcome = await translate(request.Token);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
+                outcome = LlmTranslationOutcome.Fail(LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true);
+            }
+
+            if (coordinator.IsCurrent(request.Sequence))
+            {
+                if (ReferenceEquals(state, _activeMainTranslation))
+                {
+                    _activeMainTranslation = null;
+                }
+
+                ApplyTranslationOutcome(state, outcome, model);
+                if (ReferenceEquals(state, SentenceTranslation))
+                {
+                    CanTranslateSentence = IsSentenceInput(_lastRawInput) && AppSettings.EnableAiTranslation;
+                }
+            }
+        }
+
+        private void CancelMainTranslation()
+        {
+            if (_activeMainTranslation is not AiTranslationItem state)
+            {
+                return;
+            }
+
+            _activeMainTranslation = null;
+            _translationCoordinator.Cancel();
+            state.Phase = AiTranslationPhase.Idle;
+            state.IsVisible = false;
+            if (ReferenceEquals(state, SentenceTranslation))
+            {
+                SentenceTranslation = null;
+                CanTranslateSentence = IsSentenceInput(_lastRawInput) && AppSettings.EnableAiTranslation;
+            }
+            else if (ReferenceEquals(state, PanelTranslation))
+            {
+                PanelTranslation = null;
+            }
+        }
 
         /// <summary>最近一次搜索的原始输入（未经正则清洗，整句翻译要用它）</summary>
         private string _lastRawInput = "";
@@ -99,7 +196,22 @@ namespace Flint3.ViewModels
 
         public void ExitAiTranslationMode()
         {
+            if (_activeMainTranslation is not null && ReferenceEquals(_activeMainTranslation, PanelTranslation))
+            {
+                CancelMainTranslation();
+            }
+
             IsAiTranslationMode = false;
+        }
+
+        internal void ClearPanelTranslation()
+        {
+            if (_activeMainTranslation is not null && ReferenceEquals(_activeMainTranslation, PanelTranslation))
+            {
+                CancelMainTranslation();
+            }
+
+            PanelTranslation = null;
         }
 
         private int _panelSourceIndex = 1;
@@ -108,7 +220,13 @@ namespace Flint3.ViewModels
         public int PanelSourceIndex
         {
             get => _panelSourceIndex;
-            set => SetProperty(ref _panelSourceIndex, value);
+            set
+            {
+                if (SetProperty(ref _panelSourceIndex, value))
+                {
+                    ClearPanelTranslation();
+                }
+            }
         }
 
         private int _panelTargetIndex = 1;
@@ -117,7 +235,13 @@ namespace Flint3.ViewModels
         public int PanelTargetIndex
         {
             get => _panelTargetIndex;
-            set => SetProperty(ref _panelTargetIndex, value);
+            set
+            {
+                if (SetProperty(ref _panelTargetIndex, value))
+                {
+                    ClearPanelTranslation();
+                }
+            }
         }
 
         /// <summary>
@@ -149,46 +273,21 @@ namespace Flint3.ViewModels
                 return;
             }
 
+            CancelMainTranslation();
+            AiTranslationItem panelState = new();
+            PanelTranslation = panelState;
             if (BuildAiOptions(out string? configError) is not LlmTranslationOptions options)
             {
-                AiTranslationItem failState = new();
-                PanelTranslation = failState;
-                ShowTranslationFailure(failState, LlmFailureKind.NotConfigured, configError ?? "未配置", retryable: false);
+                ShowTranslationFailure(panelState, configError ?? "未配置", retryable: false);
                 return;
             }
 
             TranslationLanguage source = (TranslationLanguage)Math.Clamp(PanelSourceIndex, 0, 4);
             TranslationLanguage target = (TranslationLanguage)Math.Clamp(PanelTargetIndex + 1, 1, 4);
 
-            SearchRequest request = _translationCoordinator.BeginRequest();
-            AiTranslationItem panelState = new();
-            PanelTranslation = panelState;
-            ShowTranslationRunning(panelState);
-
-            LlmTranslationOutcome outcome;
-            try
-            {
-                outcome = await _translationService.TranslateAsync(options, text, source, target, request.Token);
-            }
-            catch (Exception ex)
-            {
-                // client 已归一化常见错误；此处兜底，避免状态卡在"加载中"
-                System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
-                this.Dispatcher.TryEnqueue(() => ShowTranslationFailure(panelState, LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true));
-                return;
-            }
-
-            if (!_translationCoordinator.IsCurrent(request.Sequence))
-            {
-                this.Dispatcher.TryEnqueue(() =>
-                {
-                    panelState.Phase = AiTranslationPhase.Idle;
-                    panelState.IsVisible = false;
-                });
-                return;
-            }
-
-            this.Dispatcher.TryEnqueue(() => ApplyTranslationOutcome(panelState, outcome, options.Model));
+            _activeMainTranslation = panelState;
+            await RunTranslationAsync(panelState, _translationCoordinator, options.Model,
+                token => _translationService.TranslateAsync(options, text, source, target, token));
         }
 
         /// <summary>
@@ -198,7 +297,11 @@ namespace Flint3.ViewModels
         {
             _lastRawInput = rawInput?.Trim() ?? "";
 
-            // 新输入作废旧结果
+            if (_activeMainTranslation is not null && !ReferenceEquals(_activeMainTranslation, PanelTranslation))
+            {
+                CancelMainTranslation();
+            }
+
             SentenceTranslation = null;
             CanTranslateSentence = IsSentenceInput(_lastRawInput) && this.AppSettings.EnableAiTranslation;
         }
@@ -313,14 +416,12 @@ namespace Flint3.ViewModels
                 return;
             }
 
+            CancelMainTranslation();
             if (BuildAiOptions(out string? configError) is not LlmTranslationOptions options)
             {
-                ShowTranslationFailure(state, LlmFailureKind.NotConfigured, configError ?? "未配置", retryable: false);
+                ShowTranslationFailure(state, configError ?? "未配置", retryable: false);
                 return;
             }
-
-            SearchRequest request = _translationCoordinator.BeginRequest();
-            ShowTranslationRunning(state);
 
             string? referenceContext = null;
             if (TranslationDirectionDetector.Detect(item.Word) == TranslationDirection.EnToZh)
@@ -339,31 +440,9 @@ namespace Flint3.ViewModels
                 referenceContext = reference.Length > 0 ? reference : null;
             }
 
-            LlmTranslationOutcome outcome;
-            try
-            {
-                outcome = await _translationService.TranslateAsync(options, item.Word, TranslationDirection.Auto, request.Token, referenceContext);
-            }
-            catch (Exception ex)
-            {
-                // client 已归一化常见错误；此处兜底，避免状态卡在"加载中"
-                System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
-                this.Dispatcher.TryEnqueue(() => ShowTranslationFailure(state, LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true));
-                return;
-            }
-
-            if (!_translationCoordinator.IsCurrent(request.Sequence))
-            {
-                // 已被新请求顶掉，静默收起
-                this.Dispatcher.TryEnqueue(() =>
-                {
-                    state.Phase = AiTranslationPhase.Idle;
-                    state.IsVisible = false;
-                });
-                return;
-            }
-
-            this.Dispatcher.TryEnqueue(() => ApplyTranslationOutcome(state, outcome, options.Model));
+            _activeMainTranslation = state;
+            await RunTranslationAsync(state, _translationCoordinator, options.Model,
+                token => _translationService.TranslateAsync(options, item.Word, TranslationDirection.Auto, token, referenceContext));
         }
 
         /// <summary>
@@ -377,49 +456,19 @@ namespace Flint3.ViewModels
                 return;
             }
 
-            if (BuildAiOptions(out string? configError) is not LlmTranslationOptions options)
-            {
-                AiTranslationItem state = new();
-                SentenceTranslation = state;
-                ShowTranslationFailure(state, LlmFailureKind.NotConfigured, configError ?? "未配置", retryable: false);
-                CanTranslateSentence = false;
-                return;
-            }
-
-            SearchRequest request = _translationCoordinator.BeginRequest();
+            CancelMainTranslation();
             AiTranslationItem sentenceState = new();
             SentenceTranslation = sentenceState;
+            if (BuildAiOptions(out string? configError) is not LlmTranslationOptions options)
+            {
+                ShowTranslationFailure(sentenceState, configError ?? "未配置", retryable: false);
+                return;
+            }
+
             CanTranslateSentence = false;
-            ShowTranslationRunning(sentenceState);
-
-            LlmTranslationOutcome outcome;
-            try
-            {
-                outcome = await _translationService.TranslateAsync(options, text, TranslationDirection.Auto, request.Token);
-            }
-            catch (Exception ex)
-            {
-                // client 已归一化常见错误；此处兜底，避免状态卡在"加载中"
-                System.Diagnostics.Trace.WriteLine($"AI translate failed: {ex.GetType().Name}");
-                this.Dispatcher.TryEnqueue(() => ShowTranslationFailure(sentenceState, LlmFailureKind.Network, "请求失败，请检查接口配置后重试", retryable: true));
-                return;
-            }
-
-            if (!_translationCoordinator.IsCurrent(request.Sequence))
-            {
-                this.Dispatcher.TryEnqueue(() =>
-                {
-                    sentenceState.Phase = AiTranslationPhase.Idle;
-                    sentenceState.IsVisible = false;
-                });
-                return;
-            }
-
-            this.Dispatcher.TryEnqueue(() =>
-            {
-                ApplyTranslationOutcome(sentenceState, outcome, options.Model);
-                CanTranslateSentence = IsSentenceInput(_lastRawInput);
-            });
+            _activeMainTranslation = sentenceState;
+            await RunTranslationAsync(sentenceState, _translationCoordinator, options.Model,
+                token => _translationService.TranslateAsync(options, text, TranslationDirection.Auto, token));
         }
 
         /// <summary>
@@ -443,46 +492,24 @@ namespace Flint3.ViewModels
             }
         }
 
-        private void ShowTranslationRunning(AiTranslationItem state)
+        private static void ShowTranslationRunning(AiTranslationItem state)
         {
-            void Apply()
-            {
-                state.Phase = AiTranslationPhase.Running;
-                state.IsVisible = true;
-                state.ResultText = "";
-                state.ErrorText = "";
-                state.DetailText = "正在请求翻译接口...";
-                state.CanRetry = false;
-            }
-
-            if (this.Dispatcher is null)
-            {
-                Apply();
-                return;
-            }
-
-            this.Dispatcher.TryEnqueue(Apply);
+            state.Phase = AiTranslationPhase.Running;
+            state.IsVisible = true;
+            state.ResultText = "";
+            state.ErrorText = "";
+            state.DetailText = "正在请求翻译接口...";
+            state.CanRetry = false;
         }
 
-        private void ShowTranslationFailure(AiTranslationItem state, LlmFailureKind kind, string message, bool retryable)
+        private static void ShowTranslationFailure(AiTranslationItem state, string message, bool retryable)
         {
-            void Apply()
-            {
-                state.Phase = AiTranslationPhase.Failed;
-                state.IsVisible = true;
-                state.ResultText = "";
-                state.ErrorText = message;
-                state.CanRetry = retryable;
-                state.DetailText = "";
-            }
-
-            if (this.Dispatcher is null)
-            {
-                Apply();
-                return;
-            }
-
-            this.Dispatcher.TryEnqueue(Apply);
+            state.Phase = AiTranslationPhase.Failed;
+            state.IsVisible = true;
+            state.ResultText = "";
+            state.ErrorText = message;
+            state.CanRetry = retryable;
+            state.DetailText = "";
         }
 
         /// <summary>
@@ -508,12 +535,7 @@ namespace Flint3.ViewModels
             }
             else
             {
-                state.Phase = AiTranslationPhase.Failed;
-                state.IsVisible = true;
-                state.ResultText = "";
-                state.ErrorText = outcome.FailureMessage;
-                state.CanRetry = outcome.Retryable;
-                state.DetailText = "";
+                ShowTranslationFailure(state, outcome.FailureMessage, outcome.Retryable);
             }
         }
 

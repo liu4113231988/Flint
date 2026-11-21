@@ -17,6 +17,7 @@ namespace Flint3.Core.Query
         public SearchRequest BeginRequest()
         {
             CancellationTokenSource cts = new();
+            CancellationToken token = cts.Token;
             CancellationTokenSource? previous;
             long sequence;
 
@@ -31,7 +32,7 @@ namespace Flint3.Core.Query
             previous?.Cancel();
             previous?.Dispose();
 
-            return new SearchRequest(sequence, cts.Token);
+            return new SearchRequest(sequence, token);
         }
 
         /// <summary>

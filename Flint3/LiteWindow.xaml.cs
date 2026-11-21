@@ -32,6 +32,7 @@ namespace Flint3
             this.IsResizable = false;
             this.IsMaximizable = false;
             this.IsMinimizable = false;
+            App.DisablePopupTransitions(this.GetWindowHandle());
 
             this.UpdateAppBackdrop();
 
@@ -80,9 +81,9 @@ namespace Flint3
         /// <summary>
         /// 回填搜索框文本（划词翻译），赋值触发 TextChanged 走既有查词链路
         /// </summary>
-        public void ShowCapturedText(string text, bool autoTranslate)
+        public void ShowCapturedText(string text, bool translateOnMiss)
         {
-            FlintLitePage?.ShowCapturedText(text, autoTranslate);
+            FlintLitePage?.ShowCapturedText(text, translateOnMiss);
         }
 
         /// <summary>
@@ -94,6 +95,13 @@ namespace Flint3
             return FlintLitePage?.SearchTextBox?.Text ?? string.Empty;
         }
 
+        internal void Dismiss()
+        {
+            MainViewModel.Instance.CancelLiteSearch();
+            FlintLitePage?.CancelPendingTranslation();
+            this.Hide();
+        }
+
         /// <summary>
         /// 窗口激活时自动聚焦到搜索框，失去焦点时隐藏窗口
         /// </summary>
@@ -103,8 +111,7 @@ namespace Flint3
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
-                FlintLitePage?.CancelAutomaticTranslation();
-                this.Hide();
+                Dismiss();
             }
             else
             {
@@ -226,8 +233,7 @@ namespace Flint3
             try
             {
                 args.Handled = true;
-                FlintLitePage?.CancelAutomaticTranslation();
-                this.Hide();
+                Dismiss();
             }
             catch { args.Handled = false; }
         }

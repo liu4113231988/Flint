@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using Flint3.Core.Capture;
 using Flint3.Helpers;
 using Microsoft.UI.Input;
@@ -8,7 +9,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Foundation;
-using Windows.System;
+using Windows.Media.Ocr;
+using Windows.Storage.Streams;
 using Windows.Win32;
 using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.WindowsAndMessaging;
@@ -17,9 +19,15 @@ using DrawingPoint = System.Drawing.Point;
 
 namespace Flint3
 {
+    internal enum ScreenRecognitionResult
+    {
+        Success,
+        NoText,
+        Failed
+    }
+
     /// <summary>
     /// 屏幕取词覆盖窗：冻结光标所在显示器的截图，拖选区域或单击文字取词，Esc/右键取消。
-    /// 结果回调 (text, cancelled)：cancelled 为 true 表示用户主动取消，不弹任何提示
     /// </summary>
     public sealed partial class ScreenCaptureWindow : WindowEx
     {
@@ -31,17 +39,19 @@ namespace Flint3
         private static ScreenCaptureWindow? _current;
 
         private readonly ScreenCaptureResult _capture;
-        private readonly Action<string?, bool> _onCompleted;
-        private MemoryStream? _bmpStream;
+        private readonly OcrEngine _engine;
+        private readonly Action<ScreenRecognitionResult, string?, DrawingPoint?> _onCompleted;
+        private CancellationTokenSource? _recognitionCancellation;
         private Point _startDip;
         private bool _dragging;
-        private bool _finished;
+        private bool _closed;
 
         public static bool IsOpen => _current is not null;
 
-        private ScreenCaptureWindow(ScreenCaptureResult capture, Action<string?, bool> onCompleted)
+        private ScreenCaptureWindow(ScreenCaptureResult capture, OcrEngine engine, Action<ScreenRecognitionResult, string?, DrawingPoint?> onCompleted)
         {
             _capture = capture;
+            _engine = engine;
             _onCompleted = onCompleted;
 
             this.InitializeComponent();
@@ -53,10 +63,10 @@ namespace Flint3
             this.IsMaximizable = false;
             this.IsMinimizable = false;
 
-            byte[] bmp = ScreenCaptureService.EncodeBmp(capture);
-            _bmpStream = new MemoryStream(bmp);
+            using var bmp = new MemoryStream(ScreenCaptureService.EncodeBmp(capture));
+            using IRandomAccessStream stream = bmp.AsRandomAccessStream();
             var image = new BitmapImage();
-            image.SetSource(_bmpStream.AsRandomAccessStream());
+            image.SetSource(stream);
             ScreenshotImage.Source = image;
 
             // 关闭 Win11 圆角，避免截图四角被裁掉（DWMWA_WINDOW_CORNER_PREFERENCE = 33，DWMWCP_DONOTROUND = 1）
@@ -67,59 +77,48 @@ namespace Flint3
         }
 
         /// <summary>
-        /// 截取光标所在显示器并弹出覆盖窗；已有覆盖窗时再次调用视为取消。
-        /// 截屏失败回调 (null, false)
+        /// 截取光标所在显示器并弹出覆盖窗。
         /// </summary>
-        public static void Show(Action<string?, bool> onCompleted)
+        internal static bool TryShow(OcrEngine engine, Action<ScreenRecognitionResult, string?, DrawingPoint?> onCompleted)
         {
-            if (_current is not null)
+            if (!PInvoke.GetCursorPos(out DrawingPoint pt))
             {
-                _current.Cancel();
-                return;
+                return false;
             }
 
-            PInvoke.GetCursorPos(out DrawingPoint pt);
             var monitor = PInvoke.MonitorFromPoint(pt, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
-            MONITORINFO info = new MONITORINFO();
-            info.cbSize = 40;
-            PInvoke.GetMonitorInfo(monitor, ref info);
+            MONITORINFO info = new() { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
+            if (!PInvoke.GetMonitorInfo(monitor, ref info))
+            {
+                return false;
+            }
+
             int width = info.rcMonitor.right - info.rcMonitor.left;
             int height = info.rcMonitor.bottom - info.rcMonitor.top;
 
+            // 等待刚隐藏的取词窗口从桌面画面移除，再读取屏幕像素。
+            PInvoke.DwmFlush();
             ScreenCaptureResult? capture = ScreenCaptureService.CaptureRegion(info.rcMonitor.left, info.rcMonitor.top, width, height);
             if (capture is null)
             {
-                onCompleted(null, false);
-                return;
+                return false;
             }
 
-            var window = new ScreenCaptureWindow(capture, onCompleted);
+            var window = new ScreenCaptureWindow(capture, engine, onCompleted);
             _current = window;
             window.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(info.rcMonitor.left, info.rcMonitor.top, width, height));
             window.Activate();
             window.BringToFront();
-            window.RootGrid.Focus(FocusState.Programmatic);
+            return true;
         }
 
         public static void CancelCurrent()
         {
-            _current?.Cancel();
+            _current?.Close();
         }
 
         [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, uint attribute, ref int value, uint size);
-
-        private void Cancel()
-        {
-            if (_finished)
-            {
-                return;
-            }
-
-            _finished = true;
-            this.Close();
-            _onCompleted(null, true);
-        }
 
         private void OnClosed(object sender, WindowEventArgs args)
         {
@@ -128,14 +127,8 @@ namespace Flint3
                 _current = null;
             }
 
-            _bmpStream?.Dispose();
-            _bmpStream = null;
-
-            if (!_finished)
-            {
-                _finished = true;
-                _onCompleted(null, true);
-            }
+            _closed = true;
+            _recognitionCancellation?.Cancel();
         }
 
         private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -143,18 +136,22 @@ namespace Flint3
             PointerPoint point = e.GetCurrentPoint(RootGrid);
             if (point.Properties.IsRightButtonPressed)
             {
-                Cancel();
+                Close();
                 return;
             }
 
-            if (!point.Properties.IsLeftButtonPressed)
+            if (_recognitionCancellation is not null || !point.Properties.IsLeftButtonPressed)
             {
                 return;
             }
 
             _startDip = point.Position;
-            _dragging = true;
-            RootGrid.CapturePointer(e.Pointer);
+            _dragging = CaptureSurface.CapturePointer(e.Pointer);
+            if (!_dragging)
+            {
+                return;
+            }
+
             UpdateSelectionBorder(_startDip, _startDip);
             e.Handled = true;
         }
@@ -176,7 +173,7 @@ namespace Flint3
 
             _dragging = false;
             Point end = e.GetCurrentPoint(RootGrid).Position;
-            RootGrid.ReleasePointerCapture(e.Pointer);
+            CaptureSurface.ReleasePointerCapture(e.Pointer);
 
             double width = Math.Abs(end.X - _startDip.X);
             double height = Math.Abs(end.Y - _startDip.Y);
@@ -200,18 +197,32 @@ namespace Flint3
 
         private void OnPointerCaptureLost(object sender, PointerRoutedEventArgs e)
         {
-            _dragging = false;
-            SelectionBorder.Visibility = Visibility.Collapsed;
-        }
-
-        private void OnKeyDown(object sender, KeyRoutedEventArgs e)
-        {
-            if (e.Key == VirtualKey.Escape)
+            if (_dragging)
             {
-                e.Handled = true;
-                Cancel();
+                OnPointerCanceled(sender, e);
             }
         }
+
+        private void OnRootLoaded(object sender, RoutedEventArgs e)
+        {
+            CancelButton.Focus(FocusState.Programmatic);
+        }
+
+        private void OnActivated(object sender, WindowActivatedEventArgs e)
+        {
+            if (e.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                CancelButton?.Focus(FocusState.Programmatic);
+            }
+        }
+
+        private void OnCancelInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
+        {
+            e.Handled = true;
+            Close();
+        }
+
+        private void OnClickCancel(object sender, RoutedEventArgs e) => Close();
 
         private void UpdateSelectionBorder(Point a, Point b)
         {
@@ -228,12 +239,16 @@ namespace Flint3
         /// </summary>
         private async void FinishAsync(Rect dipRect, bool isClick)
         {
-            if (_finished)
+            if (_closed || _recognitionCancellation is not null)
             {
                 return;
             }
 
-            _finished = true;
+            using var cancellation = new CancellationTokenSource();
+            _recognitionCancellation = cancellation;
+            DrawingPoint? anchor = PInvoke.GetCursorPos(out DrawingPoint pointer) ? pointer : null;
+            InstructionText.Text = "正在识别…";
+            ScreenRecognitionResult result = ScreenRecognitionResult.NoText;
             string? text = null;
             try
             {
@@ -241,53 +256,54 @@ namespace Flint3
                 double sx = _capture.Width / RootGrid.ActualWidth;
                 double sy = _capture.Height / RootGrid.ActualHeight;
 
-                if (isClick)
+                int x = (int)(dipRect.X * sx);
+                int y = (int)(dipRect.Y * sy);
+                int halfWidth = isClick ? (int)(ClickCropHalfWidthDip * sx) : 0;
+                int halfHeight = isClick ? (int)(ClickCropHalfHeightDip * sy) : 0;
+                int left = x - halfWidth;
+                int top = y - halfHeight;
+                int width = isClick ? halfWidth * 2 : (int)Math.Ceiling(dipRect.Right * sx) - x;
+                int height = isClick ? halfHeight * 2 : (int)Math.Ceiling(dipRect.Bottom * sy) - y;
+                ScreenCaptureResult? crop = ScreenCaptureService.Crop(_capture, left, top, width, height);
+                if (crop is not null)
                 {
-                    int cx = (int)(dipRect.X * sx);
-                    int cy = (int)(dipRect.Y * sy);
-                    int halfWidth = (int)(ClickCropHalfWidthDip * sx);
-                    int halfHeight = (int)(ClickCropHalfHeightDip * sy);
-                    int originX = Math.Clamp(cx - halfWidth, 0, _capture.Width);
-                    int originY = Math.Clamp(cy - halfHeight, 0, _capture.Height);
-                    ScreenCaptureResult? crop = ScreenCaptureService.Crop(_capture, cx - halfWidth, cy - halfHeight, halfWidth * 2, halfHeight * 2);
-                    if (crop is not null)
+                    OcrCaptureResult ocr = await OcrService.RecognizeAsync(_engine, crop, cancellation.Token);
+                    text = isClick
+                        ? ScreenWordHitTest.FindNearestWord(ocr.Words, x - Math.Max(0, left), y - Math.Max(0, top),
+                            WordHitMaxDistanceDip * sx)?.Text
+                        : ocr.Text;
+                    if (!string.IsNullOrWhiteSpace(text))
                     {
-                        OcrCaptureResult? ocr = await OcrService.RecognizeAsync(crop);
-                        CapturedWord? hit = ocr is null
-                            ? null
-                            : ScreenWordHitTest.FindNearestWord(ocr.Words, cx - originX, cy - originY, WordHitMaxDistanceDip * sx);
-                        text = hit?.Text;
+                        result = ScreenRecognitionResult.Success;
                     }
                 }
-                else
-                {
-                    ScreenCaptureResult? crop = ScreenCaptureService.Crop(_capture,
-                        (int)(dipRect.X * sx), (int)(dipRect.Y * sy),
-                        (int)(dipRect.Width * sx), (int)(dipRect.Height * sy));
-                    if (crop is not null)
-                    {
-                        OcrCaptureResult? ocr = await OcrService.RecognizeAsync(crop);
-                        if (ocr is not null)
-                        {
-                            text = ocr.Words.Count == 1 ? ocr.Words[0].Text : ocr.Text;
-                        }
-                    }
-                }
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine(ex);
+                result = ScreenRecognitionResult.Failed;
+            }
+            finally
+            {
+                _recognitionCancellation = null;
             }
 
-            this.Close();
-            _onCompleted(string.IsNullOrWhiteSpace(text) ? null : text.Trim(), false);
+            if (!_closed)
+            {
+                Close();
+                _onCompleted(result, text?.Trim(), anchor);
+            }
         }
     }
 
     /// <summary>
     /// 十字光标根容器（ProtectedCursor 只能在派生类内设置）
     /// </summary>
-    public sealed class CrosshairGrid : Microsoft.UI.Xaml.Controls.Grid
+    public sealed partial class CrosshairGrid : Microsoft.UI.Xaml.Controls.Grid
     {
         public CrosshairGrid()
         {

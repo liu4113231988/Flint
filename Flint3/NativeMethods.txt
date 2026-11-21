@@ -6,6 +6,8 @@ MONITORINFOEXW
 SetWindowPos
 GetForegroundWindow
 GetCursorPos
+DwmFlush
+DwmSetWindowAttribute
 MonitorFromPoint
 GetDpiForMonitor
 CryptProtectData
