@@ -15,12 +15,15 @@
 	<img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200"/>
 </a>
 
+Windows x64 便携版可从 [GitHub Releases](https://github.com/liu4113231988/Flint/releases) 下载。无数据包解压后即可运行 `Flint3.exe`。要使用内置离线词典，把 `stardict.csf` 放进程序旁的 `Data/` 目录；中文反查还需要同目录的 `stardict.zhx`。也可以在设置中导入自己的 MDX 词典。
+
 #### 功能状态
 
 - [x] 快捷键唤起窗口改为纯 C# 实现（不再依赖 C++/WinRT Interop），升级到 .NET 10
-- [x] AOT L1：`Flint3.Core`、`Flint3.Data` 可 NativeAOT 发布，UI 使用 R2R + CsWinRT AOT（不裁剪）；整应用 NativeAOT（L2）不在本期范围
-- [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条。可在设置中调整导入词库的优先级
+- [x] AOT L1：`Flint3.Core`、`Flint3.Data` 可 NativeAOT 发布，UI 使用 CsWinRT AOT 优化（关闭 ReadyToRun，不裁剪）；整应用 NativeAOT（L2）不在本期范围
+- [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条。可在设置中调整导入词库的优先级。启停状态保存失败时，开关恢复原状并提示原因
 - [x] 应用单实例运行，重复启动时保留原窗口和输入，最小化后恢复到原位置
+- [x] 内置词表显示实际词数，缺少数据时提示“词典数据不可用”。删除自建生词本时，词本和词条一起删除，失败会整体回滚
 - [x] 单词模式匹配（`?` / `_` 单字母、`*` 任意长度、`^` / `$` 锚定）与内置 Wordle
 - [x] 汉英反查：输入中文精确或前缀匹配英文词，旁挂索引缺失/损坏时自动降级且不影响英文查词
 - [x] 免打包下的开机自启（写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）与界面版本号
@@ -30,7 +33,7 @@
 
 - mdx 加密、LZO 压缩、mdx 1.2 版本以及 GBK 等非 UTF-8/UTF-16 编码暂不支持，导入时会给出明确错误
 - `.mdd` 图片 / 发音等资源尚未支持，导入的 mdx 只提供词条文本
-- 整应用 NativeAOT（L2）未做；UI 仍依赖 WinUI 3 的运行时，因此保留 R2R 且不裁剪
+- 整应用 NativeAOT（L2）未做；UI 仍依赖 WinUI 3 的运行时，采用自包含发布并保留完整运行时
 - 没有应用内语言切换，界面语言跟随系统，且只保留中文与英文资源
 - 开机自启只支持当前用户（HKCU），不写入全局启动项
 - 中文反查只做精确 + 前缀：不做拼音、简繁转换与分词，子串匹配（如输入"果"查"苹果"）留待后续

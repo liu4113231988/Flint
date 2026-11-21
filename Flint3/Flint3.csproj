@@ -130,7 +130,7 @@
             BeforeTargets="AssignTargetPaths;CoreCompile">
         <ItemGroup>
             <_FlintExcludedWinUIResource Include="@(None)"
-                Condition="'%(None.Link)' != '' and $([System.Text.RegularExpressions.Regex]::IsMatch('%(None.Link)', '^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*[\\/]')) and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(None.Link)', '^(zh|en)([-\\/])'))" />
+                Condition="'%(None.Link)' != '' and $([System.Text.RegularExpressions.Regex]::IsMatch('%(None.Link)', '^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*[\\/]')) and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(None.Link)', '(?i)^($(SatelliteResourceLanguages.Replace(';', '|')))[\\/]'))" />
             <None Remove="@(_FlintExcludedWinUIResource)" />
         </ItemGroup>
     </Target>

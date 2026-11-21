@@ -1,5 +1,7 @@
 # AOT 实测报告（P3）
 
+> 本文记录历史对照实验。当前 x64 便携版默认关闭 ReadyToRun，发布参数见[构建说明](build.md#5-发布)。
+
 日期：2026-11-09　口径：L1（Data/Core 真 NativeAOT，UI 走 R2R + CsWinRT AOT，不裁剪）
 
 ## 结论

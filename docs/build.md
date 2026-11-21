@@ -57,7 +57,7 @@ dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj
 - 真实库校验用例默认跳过；`tools/prepare-data.ps1` 会设置 `FLINT_STARDICT_DB` 单独运行它
 - `legacy/` 下的旧 UWP 工程不参与 `Flint.sln` 构建与测试，仅作历史对照
 
-## 5. 发布（AOT / R2R）
+## 5. 发布
 
 ```powershell
 # 核心库 NativeAOT 验证（CLI harness，可在指定词典库上查词）
@@ -69,16 +69,16 @@ tools\Flint.Cli\bin\Release\net10.0-windows10.0.22000.0\win-x64\publish\Flint.Cl
 dotnet run --project tools\Flint.Cli -c Release -- Flint3\Data\stardict.db zhbuild Flint3\Data\stardict.zhx
 dotnet run --project tools\Flint.Cli -c Release -- Flint3\Data\stardict.csf zhbench Flint3\Data\stardict.zhx
 
-# UI：R2R + CsWinRT AOT，不裁剪
+# UI：x64 自包含发布，关闭 ReadyToRun，保留 CsWinRT AOT 优化
 dotnet publish Flint3\Flint3.csproj -c Release -r win-x64 -p:Platform=x64 `
-    -p:PublishReadyToRun=true -p:PublishTrimmed=false
+    -p:PublishReadyToRun=false -p:PublishTrimmed=false
 ```
 
 - UI 发布目录可直接拷贝运行；`PublishTrimmed` 必须保持 `false`（WinUI 3 不支持裁剪，见 AOT 口径 L1）
 - 发布无词典数据的便携版时，在 Visual Studio Developer PowerShell 中运行 `msbuild Flint3\Flint3.csproj /restore /t:Publish /p:Configuration=Release /p:Platform=x64 /p:IncludeDictionaryData=false`，并将 `PublishDir` 指定为新的输出目录。需要内置离线词典时，从克隆的仓库运行 `tools/prepare-data.ps1` 后，将生成的 `stardict.csf` 和 `stardict.zhx` 复制到便携版的 `Data/` 目录。
 - 发布产物必须包含 `Assets/`、`*.xbf` 和 `Flint3.pri`：前两者缺失会导致启动后无窗口，`.pri` 缺失会引发资源查找失败。`Flint3.csproj` 里的 `IncludeWinUIXamlArtifactsInPublish` 目标负责把它们补进发布项
-- 语言资源只保留中英：`SatelliteResourceLanguages` 负责卫星程序集；WinUI 自包含负载的 `*.mui` 是按语言目录直接拷贝的内容项，由 `FilterWinUILocalizedResources` 目标剔除。`*.pri` 是单一资源映射（只声明语言限定符，无按语言分叉的资源），不需要裁剪
-- 实测数据（启动耗时、内存、体积）见 [aot-report.md](aot-report.md)
+- 语言目录按完整名称匹配配置中的 `en`、`en-US`、`zh`、`zh-CN`。3.5.2 的 x64 包中实际包含 `en-us` 和 `zh-CN` 两个 WinUI 语言目录。`SatelliteResourceLanguages` 负责卫星程序集；WinUI 自包含负载的 `*.mui` 是按语言目录直接拷贝的内容项，由 `FilterWinUILocalizedResources` 目标剔除。`*.pri` 是单一资源映射（只声明语言限定符，无按语言分叉的资源），不需要裁剪
+- 3.5.2 x64 无数据包关闭 ReadyToRun 后，解压体积从 278.6 MiB 降至 229.5 MiB，精简包 ZIP 为 96.0 MiB。该版本未重新测量冷启动时间；此前的启动与内存对照见 [AOT 实测报告](aot-report.md)。
 
 ## 6. 常见问题
 
