@@ -99,7 +99,7 @@ namespace Flint3.ViewModels
         {
             // 加载生词本数据库
             this.LoadMyGlossaries();
-            this.LoadExGlossaries();
+            _ = LoadExGlossaries();
         }
 
         /// <summary>
@@ -221,7 +221,7 @@ namespace Flint3.ViewModels
         /// <summary>
         /// 初始化内置生词本
         /// </summary>
-        public void LoadExGlossaries()
+        private async Task LoadExGlossaries()
         {
             try
             {
@@ -234,7 +234,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uE128",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 3461
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -244,7 +244,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uF7DB",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 5040
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -254,7 +254,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uF7DB",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 6974
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -264,7 +264,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uF7DB",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 7504
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -274,7 +274,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uE7BE",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 4801
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -284,7 +284,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uE1D3",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 5407
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -294,7 +294,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uE1D3",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 3849
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -304,7 +304,7 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uE7BC",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 3677
+                    GlossaryWordsCount = -2
                 });
 
                 this.ExGlossaries.Add(new()
@@ -314,22 +314,14 @@ namespace Flint3.ViewModels
                     GlossaryIcon = "\uE913",
                     IsReadOnly = true,
                     GlossaryDescription = "这是一个扩展生词本，词汇仅供参考，请勿仅依赖这些词汇进行复习。",
-                    GlossaryWordsCount = 1603
+                    GlossaryWordsCount = -2
                 });
 
-                //await Task.Run(() =>
-                //{
-                //    foreach (var item in ExGlossaries)
-                //    {
-                //        // 查找每个生词本的单词数量，并且生成描述
-                //        var count = StarDictDataAccess.GetExGlossaryWordCount(item.ExtraGlossaryInternalTag);
-                //        Dispatcher.TryEnqueue(() =>
-                //        {
-                //            item.GlossaryWordsCount = count;
-                //            item.GlossaryDescription = $"共 {item.GlossaryWordsCount} 个单词";
-                //        });
-                //    }
-                //});
+                foreach (var glossary in ExGlossaries)
+                {
+                    glossary.GlossaryWordsCount = await Task.Run(() =>
+                        StarDictDataAccess.GetExtraGlossaryWordsCount(glossary.ExtraGlossaryInternalTag));
+                }
             }
             catch (Exception e)
             {
@@ -514,15 +506,8 @@ namespace Flint3.ViewModels
         /// <param name="id"></param>
         public async Task DeleteMyGlossary(int id)
         {
-            try
-            {
-                await GlossaryDataAccess.DeleteGlossary(id);
-                LoadMyGlossaries();
-            }
-            catch (Exception e)
-            {
-                System.Diagnostics.Trace.WriteLine(e.Message);
-            }
+            await GlossaryDataAccess.DeleteGlossary(id);
+            LoadMyGlossaries();
         }
 
         /// <summary>

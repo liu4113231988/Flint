@@ -285,8 +285,18 @@ namespace Flint3.Views
                 return;
             }
 
+            try
+            {
+                _viewModel.DictionaryStore.SetEnabled(info, toggle.IsOn);
+            }
+            catch (Exception ex)
+            {
+                toggle.IsOn = info.Enabled;
+                ShowDictionaryMessage($"保存词库状态失败：{ex.Message}", InfoBarSeverity.Error);
+                return;
+            }
+
             info.Enabled = toggle.IsOn;
-            _viewModel.DictionaryStore.SetEnabled(info, toggle.IsOn);
             _viewModel.RefreshDictionarySources();
         }
 

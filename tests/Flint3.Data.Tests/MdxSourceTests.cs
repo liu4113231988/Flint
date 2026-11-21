@@ -35,6 +35,17 @@ namespace Flint3.Data.Tests
         private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "Fixtures", name);
 
         [Fact]
+        public async Task FailedTogglePreservesSavedState()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            var info = await store.ImportAsync(Fixture("basic.mdx"));
+            Directory.CreateDirectory(Path.Combine(_baseDirectory, "dictionarySources.json.tmp"));
+
+            Assert.Throws<UnauthorizedAccessException>(() => store.SetEnabled(info, false));
+            Assert.True(Assert.Single(store.Load().Dictionaries).Enabled);
+        }
+
+        [Fact]
         public async Task 导入后能按精确与前缀查询并返回纯文本记录()
         {
             MdxDictionaryStore store = new(_baseDirectory);

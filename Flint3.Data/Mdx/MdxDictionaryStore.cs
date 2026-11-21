@@ -221,11 +221,13 @@ namespace Flint3.Data.Mdx
             {
                 MdxDictionarySettings settings = Load();
                 MdxDictionaryInfo? target = settings.Dictionaries.Find(item => item.Id == info.Id);
-                if (target is not null)
+                if (target is null)
                 {
-                    target.Enabled = enabled;
-                    Save(settings);
+                    throw new InvalidOperationException("无法在配置中找到词库。");
                 }
+
+                target.Enabled = enabled;
+                Save(settings);
             }
         }
 

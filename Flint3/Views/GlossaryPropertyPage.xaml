@@ -66,9 +66,7 @@
                         <TextBlock Text="词汇"/>
                     </labs:SettingsCard.Header>
                     <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0.7">
-                        <Run Text="共"/>
-                        <Run Text="{x:Bind ViewModel.SelectedGlossary.GlossaryWordsCount,Mode=OneWay}"/>
-                        <Run Text="个单词"/>
+                        <Run Text="{x:Bind ViewModel.SelectedGlossary.GlossaryWordsCountText,Mode=OneWay}"/>
                     </TextBlock>
                 </labs:SettingsCard>
                 <labs:SettingsCard Margin="0,2,0,0" HorizontalAlignment="Stretch" MinHeight="0" Padding="20,20"

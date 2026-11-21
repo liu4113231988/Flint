@@ -146,7 +146,17 @@ namespace Flint3.Views
                     this.Frame.GoBack();
                 }
             }
-            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                await new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = "删除生词本失败",
+                    Content = "请检查数据库是否可写，然后重试。",
+                    CloseButtonText = "关闭"
+                }.ShowAsync();
+            }
         }
     }
 }

@@ -124,17 +124,14 @@ namespace Flint3.Data
         /// <returns></returns>
         public static async Task DeleteGlossary(int glossaryId)
         {
-            try
-            {
-                using SqliteCommand deleteCommand = new($"DELETE FROM glossaryCategory WHERE id=$glossaryid;", _glossaryDb);
-                deleteCommand.Parameters.AddWithValue("$glossaryid", glossaryId);
-                await deleteCommand.ExecuteNonQueryAsync();
-
-                using SqliteCommand deleteWordsCommand = new($"DELETE FROM glossary WHERE glossaryid=$glossaryid;", _glossaryDb);
-                deleteWordsCommand.Parameters.AddWithValue("$glossaryid", glossaryId);
-                await deleteWordsCommand.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+            var connection = _glossaryDb ?? throw new InvalidOperationException("生词本数据库尚未打开。");
+            using var transaction = connection.BeginTransaction();
+            using SqliteCommand command = new(
+                "DELETE FROM glossary WHERE glossaryid=$id; DELETE FROM glossaryCategory WHERE id=$id;",
+                connection, transaction);
+            command.Parameters.AddWithValue("$id", glossaryId);
+            await command.ExecuteNonQueryAsync();
+            transaction.Commit();
         }
 
         /// <summary>

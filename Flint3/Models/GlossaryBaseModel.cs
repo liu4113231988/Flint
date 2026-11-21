@@ -38,8 +38,21 @@ namespace Flint3.Models
         public int GlossaryWordsCount
         {
             get => _glossaryWordsCount;
-            set => SetProperty(ref _glossaryWordsCount, value);
+            set
+            {
+                if (SetProperty(ref _glossaryWordsCount, value))
+                {
+                    OnPropertyChanged(nameof(GlossaryWordsCountText));
+                }
+            }
         }
+
+        public string GlossaryWordsCountText => GlossaryWordsCount switch
+        {
+            -2 => "正在统计词数…",
+            < 0 => "词典数据不可用",
+            _ => $"共 {GlossaryWordsCount} 个单词"
+        };
 
         /// <summary>
         /// 生词本的图标
