@@ -4,5 +4,6 @@
         <RootNamespace>Flint3.Dict</RootNamespace>
         <Nullable>enable</Nullable>
         <IsAotCompatible>true</IsAotCompatible>
+        <Platforms>AnyCPU;x64</Platforms>
     </PropertyGroup>
 </Project>

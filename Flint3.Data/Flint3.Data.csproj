@@ -10,6 +10,7 @@
         <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+        <Platforms>AnyCPU;x64</Platforms>
     </PropertyGroup>
 
     <ItemGroup>
