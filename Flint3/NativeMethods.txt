@@ -5,6 +5,8 @@ GetDpiForWindow
 MONITORINFOEXW
 SetWindowPos
 GetForegroundWindow
+GetWindowThreadProcessId
+IsIconic
 GetCursorPos
 DwmFlush
 DwmSetWindowAttribute

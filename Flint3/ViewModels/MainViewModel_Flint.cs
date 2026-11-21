@@ -44,6 +44,10 @@ namespace Flint3.ViewModels
             WordQueryService previous = _wordQueryService;
             _wordQueryService = CreateQueryService();
             previous.Dispose();
+            if (_lastRawInput.Length > 0)
+            {
+                MatchWord(_lastRawInput, searchingFromMain: true);
+            }
         }
 
         private WordQueryService CreateQueryService()

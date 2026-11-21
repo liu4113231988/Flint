@@ -13,7 +13,7 @@ using Xunit;
 namespace Flint3.Data.Tests
 {
     /// <summary>
-    /// 用 writemdict 生成的样本 mdx 验证导入、索引与查询链路
+    /// 用样本 mdx 验证导入、索引与查询链路
     /// </summary>
     public sealed class MdxSourceTests : IDisposable
     {
@@ -66,11 +66,102 @@ namespace Flint3.Data.Tests
         public async Task 重复导入同一文件复用已有索引()
         {
             MdxDictionaryStore store = new(_baseDirectory);
-            MdxDictionaryInfo first = await store.ImportAsync(Fixture("basic.mdx"));
-            MdxDictionaryInfo second = await store.ImportAsync(Fixture("basic.mdx"));
+            MdxDictionaryInfo[] imports = await Task.WhenAll(
+                store.ImportAsync(Fixture("basic.mdx")), store.ImportAsync(Fixture("basic.mdx")));
 
-            Assert.Equal(first.Id, second.Id);
+            Assert.Equal(imports[0].Id, imports[1].Id);
             Assert.Single(store.Load().Dictionaries);
+        }
+
+        [Fact]
+        public async Task 黄金词库的100个词条经过导入与查词后符合固定期望()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            string[] expected = File.ReadAllLines(Fixture("mdx-golden.tsv"));
+            MdxDictionaryInfo golden = await store.ImportAsync(Fixture("mdx-golden.mdx"));
+            Assert.Equal(100, expected.Length);
+            Assert.Equal(expected.Length, golden.EntryCount);
+            using WordQueryService service = new(store.CreateSources());
+
+            foreach (string line in expected)
+            {
+                string[] fields = line.Split('\t');
+                WordEntry entry = Assert.Single(await service.QueryAsync(fields[0].ToUpperInvariant()));
+                Assert.Equal(fields[0], entry.Word);
+                Assert.Equal(fields[1], entry.Translation);
+                Assert.Equal("Golden dictionary", entry.Source);
+            }
+
+            string[] cats = ["cat", "catalog", "catch"];
+            Assert.Equal(cats, (await service.MatchAsync("cat", 10)).Select(entry => entry.Word));
+            Assert.Equal(cats, (await service.PatternAsync("^cat*", 10)).Select(entry => entry.Word));
+            Assert.Empty(await service.QueryAsync("caterpillar"));
+        }
+
+        [Fact]
+        public async Task 调整词库优先级后重读设置并用新顺序去重()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            MdxDictionaryInfo basic = await store.ImportAsync(Fixture("basic.mdx"));
+            MdxDictionaryInfo golden = await store.ImportAsync(Fixture("mdx-golden.mdx"));
+            using (WordQueryService original = new(store.CreateSources()))
+            {
+                Assert.Equal("Basic dictionary", Assert.Single(await original.QueryAsync("alpha")).Source);
+            }
+
+            Assert.True(store.Move(golden.Id, higher: true));
+            Assert.False(store.Move(golden.Id, higher: true));
+            Assert.False(store.Move(basic.Id, higher: false));
+            Assert.False(store.Move("missing", higher: false));
+
+            MdxDictionaryStore reloaded = new(_baseDirectory);
+            Assert.Equal(new[] { golden.Id, basic.Id }, reloaded.Load().Dictionaries.Select(info => info.Id));
+            using (WordQueryService reordered = new(reloaded.CreateSources()))
+            {
+                Assert.Equal("希腊字母 α", Assert.Single(await reordered.QueryAsync("alpha")).Translation);
+                Assert.Equal("Golden dictionary", Assert.Single(await reordered.MatchAsync("alph", 10)).Source);
+                Assert.Equal("Golden dictionary", Assert.Single(await reordered.PatternAsync("^alpha$", 10)).Source);
+            }
+
+            reloaded.SetEnabled(golden, false);
+            using (WordQueryService disabled = new(reloaded.CreateSources()))
+            {
+                Assert.Equal("Basic dictionary", Assert.Single(await disabled.QueryAsync("alpha")).Source);
+            }
+
+            reloaded.SetEnabled(golden, true);
+            Assert.Equal(golden.Id, reloaded.Load().Dictionaries[0].Id);
+            Assert.True(reloaded.Move(golden.Id, higher: false));
+            Assert.Equal(basic.Id, reloaded.Load().Dictionaries[0].Id);
+        }
+
+        [Fact]
+        public async Task 导入保留进行期间改动的已有词库状态()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            MdxDictionaryInfo basic = await store.ImportAsync(Fixture("basic.mdx"));
+            await store.ImportAsync(Fixture("mdx-golden.mdx"), new OnFirstProgress(() => store.SetEnabled(basic, false)));
+
+            Assert.False(store.Load().Dictionaries[0].Enabled);
+            using WordQueryService service = new(store.CreateSources());
+            Assert.Equal("Golden dictionary", Assert.Single(await service.QueryAsync("alpha")).Source);
+        }
+
+        [Fact]
+        public async Task 重新导入修复缺失索引时保留已有优先级和启用状态()
+        {
+            MdxDictionaryStore store = new(_baseDirectory);
+            await store.ImportAsync(Fixture("basic.mdx"));
+            MdxDictionaryInfo golden = await store.ImportAsync(Fixture("mdx-golden.mdx"));
+            Assert.True(store.Move(golden.Id, higher: true));
+            store.SetEnabled(golden, false);
+            File.Delete(store.GetIndexPath(golden));
+
+            MdxDictionaryInfo repaired = await store.ImportAsync(Fixture("mdx-golden.mdx"));
+
+            Assert.True(File.Exists(store.GetIndexPath(repaired)));
+            Assert.False(repaired.Enabled);
+            Assert.Equal(golden.Id, store.Load().Dictionaries[0].Id);
         }
 
         [Fact]
@@ -287,6 +378,13 @@ namespace Flint3.Data.Tests
         /// <summary>
         /// 首次进度回调就取消，用于验证导入中途取消的清理路径
         /// </summary>
+        private sealed class OnFirstProgress(Action action) : IProgress<double>
+        {
+            private Action? _action = action;
+
+            public void Report(double value) => Interlocked.Exchange(ref _action, null)?.Invoke();
+        }
+
         private sealed class CancelOnFirstProgress(CancellationTokenSource cancellation) : IProgress<double>
         {
             public void Report(double value) => cancellation.Cancel();

@@ -53,6 +53,7 @@ dotnet test tests\Flint3.Dict.Tests\Flint3.Dict.Tests.csproj
 
 - 核心层用例覆盖快捷键 handle 编码、`HotkeySettings` 校验/显示名、固定键盘布局下的按键名解析、模式匹配语法与 Wordle 判定
 - 数据层用例使用临时目录里的小型 fixture 库，不依赖真实 `stardict.db`；其中中文反查用例覆盖排序契约的固定期望、前缀归并去重、结果上限与索引缺失/损坏/版本不符/记录数不一致的回退
+- MDX 黄金用例从多块压缩词库验证 100 条固定释义。运行 `python tools/mdx/generate-golden-fixture.py` 可从测试目录中的 `mdx-golden.tsv` 重新生成词库样本。
 - 真实库校验用例默认跳过；`tools/prepare-data.ps1` 会设置 `FLINT_STARDICT_DB` 单独运行它
 - `legacy/` 下的旧 UWP 工程不参与 `Flint.sln` 构建与测试，仅作历史对照
 

@@ -25,6 +25,8 @@ namespace Flint3.Data.Mdx
         private readonly string _baseDirectory;
 
         private readonly ConcurrentDictionary<string, byte> _upgrading = new();
+        private readonly Lock _settingsGate = new();
+        private readonly SemaphoreSlim _importGate = new(1);
 
         public MdxDictionaryStore(string? baseDirectory = null)
         {
@@ -40,20 +42,23 @@ namespace Flint3.Data.Mdx
 
         public MdxDictionarySettings Load()
         {
-            try
+            lock (_settingsGate)
             {
-                if (!File.Exists(SettingsPath))
+                try
                 {
+                    if (!File.Exists(SettingsPath))
+                    {
+                        return new MdxDictionarySettings();
+                    }
+
+                    string json = File.ReadAllText(SettingsPath);
+                    return JsonSerializer.Deserialize(json, MdxJsonContext.Default.MdxDictionarySettings) ?? new MdxDictionarySettings();
+                }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine(ex);
                     return new MdxDictionarySettings();
                 }
-
-                string json = File.ReadAllText(SettingsPath);
-                return JsonSerializer.Deserialize(json, MdxJsonContext.Default.MdxDictionarySettings) ?? new MdxDictionarySettings();
-            }
-            catch (Exception ex)
-            {
-                Trace.WriteLine(ex);
-                return new MdxDictionarySettings();
             }
         }
 
@@ -75,6 +80,20 @@ namespace Flint3.Data.Mdx
             IProgress<double>? progress = null,
             CancellationToken cancellationToken = default)
         {
+            await _importGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await ImportFileAsync(mdxPath, progress, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _importGate.Release();
+            }
+        }
+
+        private async Task<MdxDictionaryInfo> ImportFileAsync(
+            string mdxPath, IProgress<double>? progress, CancellationToken cancellationToken)
+        {
             string sourcePath = Path.GetFullPath(mdxPath);
             if (!File.Exists(sourcePath))
             {
@@ -82,8 +101,8 @@ namespace Flint3.Data.Mdx
             }
 
             string id = await ComputeIdAsync(sourcePath, cancellationToken).ConfigureAwait(false);
-            MdxDictionarySettings settings = Load();
-            MdxDictionaryInfo? existing = settings.Dictionaries.Find(item => item.Id == id && File.Exists(GetIndexPath(item)));
+            MdxDictionaryInfo? existing = Load().Dictionaries.Find(item => item.Id == id
+                && File.Exists(GetDictionaryPath(item)) && File.Exists(GetIndexPath(item)));
             if (existing is not null)
             {
                 return existing;
@@ -100,12 +119,17 @@ namespace Flint3.Data.Mdx
             string indexFileName = id + ".db";
             string targetPath = Path.Combine(DictionariesDirectory, fileName);
             string indexPath = Path.Combine(DictionariesDirectory, indexFileName);
+            string? stagingPath = string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase)
+                ? null
+                : targetPath + ".import";
+            bool targetExists = File.Exists(targetPath);
+            bool indexExists = File.Exists(indexPath);
 
             try
             {
-                if (!string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                if (stagingPath is not null)
                 {
-                    await CopyFileAsync(sourcePath, targetPath, progress, cancellationToken).ConfigureAwait(false);
+                    await CopyFileAsync(sourcePath, stagingPath, progress, cancellationToken).ConfigureAwait(false);
                 }
 
                 IProgress<double>? indexProgress = progress is null
@@ -113,7 +137,7 @@ namespace Flint3.Data.Mdx
                     : new ScaledProgress(progress, CopyProgressShare, 1 - CopyProgressShare);
 
                 long entryCount = await Task.Run(
-                    () => MdxIndexDatabase.Build(targetPath, indexPath, indexProgress, cancellationToken),
+                    () => MdxIndexDatabase.Build(stagingPath ?? targetPath, indexPath, indexProgress, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
 
                 MdxDictionaryInfo info = new()
@@ -126,37 +150,102 @@ namespace Flint3.Data.Mdx
                     Enabled = true,
                 };
 
-                settings.Dictionaries.RemoveAll(item => item.Id == id);
-                settings.Dictionaries.Add(info);
-                Save(settings);
+                lock (_settingsGate)
+                {
+                    if (stagingPath is not null)
+                    {
+                        File.Move(stagingPath, targetPath, overwrite: true);
+                    }
+
+                    MdxDictionarySettings settings = Load();
+                    int index = settings.Dictionaries.FindIndex(item => item.Id == id);
+                    if (index < 0)
+                    {
+                        settings.Dictionaries.Add(info);
+                    }
+                    else
+                    {
+                        info.Enabled = settings.Dictionaries[index].Enabled;
+                        settings.Dictionaries[index] = info;
+                    }
+
+                    Save(settings);
+                }
+
                 return info;
             }
             catch
             {
-                TryDelete(targetPath);
-                TryDelete(indexPath);
+                if (!targetExists)
+                {
+                    TryDelete(targetPath);
+                }
+
+                if (!indexExists)
+                {
+                    TryDelete(indexPath);
+                }
+
                 throw;
+            }
+            finally
+            {
+                if (stagingPath is not null)
+                {
+                    TryDelete(stagingPath);
+                }
             }
         }
 
         public void Remove(MdxDictionaryInfo info)
         {
-            TryDelete(GetDictionaryPath(info));
-            TryDelete(GetIndexPath(info));
+            lock (_settingsGate)
+            {
+                MdxDictionarySettings settings = Load();
+                MdxDictionaryInfo? target = settings.Dictionaries.Find(item => item.Id == info.Id);
+                if (target is null)
+                {
+                    return;
+                }
 
-            MdxDictionarySettings settings = Load();
-            settings.Dictionaries.RemoveAll(item => item.Id == info.Id);
-            Save(settings);
+                settings.Dictionaries.Remove(target);
+                Save(settings);
+                TryDelete(GetDictionaryPath(target));
+                TryDelete(GetIndexPath(target));
+            }
         }
 
         public void SetEnabled(MdxDictionaryInfo info, bool enabled)
         {
-            MdxDictionarySettings settings = Load();
-            MdxDictionaryInfo? target = settings.Dictionaries.Find(item => item.Id == info.Id);
-            if (target is not null)
+            lock (_settingsGate)
             {
-                target.Enabled = enabled;
+                MdxDictionarySettings settings = Load();
+                MdxDictionaryInfo? target = settings.Dictionaries.Find(item => item.Id == info.Id);
+                if (target is not null)
+                {
+                    target.Enabled = enabled;
+                    Save(settings);
+                }
+            }
+        }
+
+        /// <summary>词库越靠前，在相同匹配级别内越先参与查询和去重。</summary>
+        public bool Move(string id, bool higher)
+        {
+            lock (_settingsGate)
+            {
+                MdxDictionarySettings settings = Load();
+                List<MdxDictionaryInfo> dictionaries = settings.Dictionaries;
+                int index = dictionaries.FindIndex(item => item.Id == id);
+                int destination = index + (higher ? -1 : 1);
+                if (index < 0 || destination < 0 || destination >= dictionaries.Count)
+                {
+                    return false;
+                }
+
+                (dictionaries[index], dictionaries[destination]) = (dictionaries[destination], dictionaries[index]);
                 Save(settings);
+                return true;
             }
         }
 

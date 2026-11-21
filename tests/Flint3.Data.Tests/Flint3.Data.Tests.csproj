@@ -18,5 +18,6 @@
 
     <ItemGroup>
         <None Include="Fixtures\**\*.mdx" CopyToOutputDirectory="PreserveNewest" />
+        <None Update="Fixtures\mdx-golden.tsv" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

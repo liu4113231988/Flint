@@ -161,9 +161,44 @@ namespace Flint3.Views
             }
 
             DictionaryEmptyTextBlock.Visibility = _dictionaries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            DictionaryPriorityControls.Visibility = _dictionaries.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
             DictionarySummaryTextBlock.Text = _dictionaries.Count == 0
                 ? "导入 mdx 词库以扩展查词结果"
                 : $"已导入 {_dictionaries.Count} 个词库，点击展开管理";
+        }
+
+        private void OnDictionarySelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            int selectedIndex = DictionaryListView.SelectedIndex;
+            MoveDictionaryUpButton.IsEnabled = selectedIndex > 0;
+            MoveDictionaryDownButton.IsEnabled = selectedIndex >= 0 && selectedIndex < _dictionaries.Count - 1;
+        }
+
+        private void OnClickMoveDictionaryUp(object sender, RoutedEventArgs e) => MoveSelectedDictionary(higher: true);
+
+        private void OnClickMoveDictionaryDown(object sender, RoutedEventArgs e) => MoveSelectedDictionary(higher: false);
+
+        private void MoveSelectedDictionary(bool higher)
+        {
+            if (DictionaryListView.SelectedItem is not MdxDictionaryInfo info)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_viewModel.DictionaryStore.Move(info.Id, higher))
+                {
+                    LoadDictionaries();
+                    DictionaryListView.SelectedItem = _dictionaries.FirstOrDefault(item => item.Id == info.Id);
+                    _viewModel.RefreshDictionarySources();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                ShowDictionaryMessage("保存词库优先级失败，请重试。", InfoBarSeverity.Error);
+            }
         }
 
         /// <summary>

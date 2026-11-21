@@ -412,7 +412,8 @@
                         <labs:SettingsCard HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ContentAlignment="Vertical">
                             <StackPanel Orientation="Vertical" Spacing="8" HorizontalAlignment="Stretch">
                                 <TextBlock x:Name="DictionaryEmptyTextBlock" Text="还没有导入 mdx 词库" FontSize="12" Opacity="0.6"/>
-                                <ListView x:Name="DictionaryListView" Background="Transparent" Padding="0" HorizontalAlignment="Stretch" SelectionMode="None" ScrollViewer.VerticalScrollMode="Disabled">
+                                <ListView x:Name="DictionaryListView" Background="Transparent" Padding="0" HorizontalAlignment="Stretch" SelectionMode="Single"
+                                          AutomationProperties.Name="已导入的 MDX 词库" SelectionChanged="OnDictionarySelectionChanged" ScrollViewer.VerticalScrollMode="Disabled">
                                     <ListView.ItemContainerStyle>
                                         <Style TargetType="ListViewItem">
                                             <Setter Property="Padding" Value="0"/>
@@ -445,6 +446,13 @@
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
                                 </ListView>
+                                <StackPanel x:Name="DictionaryPriorityControls" Spacing="6" Visibility="Collapsed">
+                                    <TextBlock Text="词库越靠上，同一匹配级别内越优先。" FontSize="12" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="MoveDictionaryUpButton" Content="上移" AutomationProperties.Name="提高所选词库的优先级" Click="OnClickMoveDictionaryUp" IsEnabled="False"/>
+                                        <Button x:Name="MoveDictionaryDownButton" Content="下移" AutomationProperties.Name="降低所选词库的优先级" Click="OnClickMoveDictionaryDown" IsEnabled="False"/>
+                                    </StackPanel>
+                                </StackPanel>
                                 <ProgressBar x:Name="ImportProgressBar" Maximum="100" Visibility="Collapsed"/>
                                 <InfoBar x:Name="DictionaryInfoBar" IsOpen="False" IsClosable="True"/>
                                 <Grid ColumnSpacing="8">

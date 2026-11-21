@@ -19,7 +19,8 @@
 
 - [x] 快捷键唤起窗口改为纯 C# 实现（不再依赖 C++/WinRT Interop），升级到 .NET 10
 - [x] AOT L1：`Flint3.Core`、`Flint3.Data` 可 NativeAOT 发布，UI 使用 R2R + CsWinRT AOT（不裁剪）；整应用 NativeAOT（L2）不在本期范围
-- [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条
+- [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条。可在设置中调整导入词库的优先级
+- [x] 应用单实例运行，重复启动时保留原窗口和输入，最小化后恢复到原位置
 - [x] 单词模式匹配（`?` / `_` 单字母、`*` 任意长度、`^` / `$` 锚定）与内置 Wordle
 - [x] 汉英反查：输入中文精确或前缀匹配英文词，旁挂索引缺失/损坏时自动降级且不影响英文查词
 - [x] 免打包下的开机自启（写入 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）与界面版本号

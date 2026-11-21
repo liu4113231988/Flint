@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Drawing;
-using System.Threading.Tasks;
 using Flint3.Core.Capture;
 using Flint3.Data;
 using Flint3.Helpers;
@@ -26,6 +25,7 @@ namespace Flint3
     public partial class App : Application
     {
         private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue;
+        private bool _activateAfterLaunch;
 
         /// <summary>
         /// 应用程序系统托盘
@@ -35,7 +35,7 @@ namespace Flint3
         /// <summary>
         /// 燧石的主窗口，点击桌面图标或者右下角托盘时一定打开这个窗口
         /// </summary>
-        public static MainWindow FlintMainWindow { get; private set; } = new MainWindow();
+        public static MainWindow FlintMainWindow { get; private set; } = null!;
 
         /// <summary>
         /// 燧石的简洁搜索窗口，设置中开启简洁窗口后，按下快捷键会唤起这个窗口
@@ -57,41 +57,56 @@ namespace Flint3
                 e.Handled = true;
                 Trace.WriteLine(e.Message);
             };
-
-            CreateTrayIcon();
         }
 
         /// <summary>
         /// Invoked when the application is launched.
         /// </summary>
         /// <param name="args">Details about the launch request and process.</param>
-        protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            if (FlintMainWindow is not null)
+            {
+                return;
+            }
+
+            FlintMainWindow = new MainWindow();
+            CreateTrayIcon();
+
             AppActivationArguments activatedArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
-            if (activatedArgs?.Kind == ExtendedActivationKind.StartupTask)
+            if (activatedArgs?.Kind == ExtendedActivationKind.StartupTask && !_activateAfterLaunch)
             {
                 HideApp();
             }
             else
             {
-                await ShowMainWindowFromRedirectAsync();
+                ShowMainWindow();
             }
         }
 
-        /// <summary>
-        /// 重定向唤起主窗口
-        /// </summary>
-        /// <returns></returns>
-        public async Task ShowMainWindowFromRedirectAsync()
+        internal void ActivateExistingWindow()
         {
-            while (FlintMainWindow == null)
-            {
-                await Task.Delay(100);
-            }
-
             _dispatcherQueue.TryEnqueue(() =>
             {
-                ShowMainWindow();
+                if (FlintMainWindow is not MainWindow window)
+                {
+                    _activateAfterLaunch = true;
+                    return;
+                }
+
+                if (PInvoke.IsIconic(new HWND(window.GetWindowHandle())))
+                {
+                    window.Restore();
+                    return;
+                }
+
+                PInvoke.GetWindowThreadProcessId(PInvoke.GetForegroundWindow(), out uint foregroundProcessId);
+                if (foregroundProcessId == Environment.ProcessId)
+                {
+                    return;
+                }
+
+                window.Activate();
             });
         }
 
@@ -193,8 +208,6 @@ namespace Flint3
             ScreenCaptureWindow.CancelCurrent();
             MainViewModel.Instance.DismissSelectionIcon();
             FlintLiteWindow?.Dismiss();
-
-            FlintMainWindow ??= new MainWindow();
 
             if (MainViewModel.Instance.AppSettings.AutoClearLastInput)
             {
