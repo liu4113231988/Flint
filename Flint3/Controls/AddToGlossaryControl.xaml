@@ -116,7 +116,10 @@
                 </Button>
             </StackPanel>
         </ScrollViewer>
-        <Button Grid.Row="4" Content="添加" Margin="20,12,20,18" BorderThickness="0" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}"
-                IsEnabled="{x:Bind GlossaryComboBox.SelectedIndex,Mode=OneWay,Converter={StaticResource Int2Bool},ConverterParameter=0}" Click="OnClickAddWord"/>
+        <StackPanel Grid.Row="4">
+            <TextBlock x:Name="SaveError" Text="无法写入生词本，请检查本地存储后重试。" TextWrapping="Wrap" Margin="20,4,20,0" Visibility="Collapsed"/>
+            <Button Content="添加" Margin="20,12,20,18" BorderThickness="0" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}"
+                    IsEnabled="{x:Bind GlossaryComboBox.SelectedIndex,Mode=OneWay,Converter={StaticResource Int2Bool},ConverterParameter=0}" Click="OnClickAddWord"/>
+        </StackPanel>
     </Grid>
 </UserControl>

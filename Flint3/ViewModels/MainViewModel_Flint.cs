@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -19,12 +19,10 @@ namespace Flint3.ViewModels
 
         private const int PatternSearchLimit = 40;
 
-        [System.Text.RegularExpressions.GeneratedRegex(@"[^\w]*")]
-        private static partial System.Text.RegularExpressions.Regex WordSearchRegex();
-
         private readonly MdxDictionaryStore _mdxDictionaryStore = new();
 
         private WordQueryService _wordQueryService;
+        private bool _hasImportedSources;
 
         private readonly SearchCoordinator _searchCoordinator = new();
         private readonly SearchCoordinator _liteSearchCoordinator = new();
@@ -54,6 +52,7 @@ namespace Flint3.ViewModels
         {
             List<IWordSource> sources = [new EcdictSource()];
             sources.AddRange(_mdxDictionaryStore.CreateSources());
+            _hasImportedSources = sources.Count > 1;
             return new WordQueryService(sources);
         }
 
@@ -123,11 +122,11 @@ namespace Flint3.ViewModels
                 return;
             }
 
-            _ = SearchWordAsync(WordSearchRegex().Replace(word, ""), wordsCollection, limit, request);
+            _ = SearchWordAsync(trimmed, wordsCollection, limit, request);
         }
 
         /// <summary>
-        /// 通配符输入不能交给 WordSearchRegex 清洗，否则 ? 与 * 会被直接删掉
+        /// 合法的通配符输入走模式查询
         /// </summary>
         private static bool IsPatternInput(string input)
         {
@@ -137,35 +136,12 @@ namespace Flint3.ViewModels
 
         internal void CancelLiteSearch() => _liteSearchCoordinator.Cancel();
 
-        internal async Task<bool> PreviewCapturedTextAsync(string text)
+        internal Task PreviewCapturedTextAsync(string text)
         {
             SearchRequest request = _liteSearchCoordinator.BeginRequest();
             LiteSearchResultWordItems.Clear();
             LiteSearchHint = string.Empty;
-
-            try
-            {
-                // 先查完整词组，保留词条中的空格和标点。
-                IReadOnlyList<WordEntry> entries = await _wordQueryService.QueryAsync(text, request.Token);
-                bool isSentence = IsSentenceInput(text);
-                if (entries.Count == 0 && !isSentence)
-                {
-                    string word = WordSearchRegex().Replace(text, "");
-                    entries = await _wordQueryService.MatchAsync(word, 10, request.Token);
-                    if (!ChineseTermExtractor.TryNormalizeQuery(word, out _))
-                    {
-                        entries = entries.Where(entry => entry.Word.StartsWith(word, StringComparison.OrdinalIgnoreCase)).ToArray();
-                    }
-                }
-
-                request.Token.ThrowIfCancellationRequested();
-                PublishResults(LiteSearchResultWordItems, entries, request.Sequence,
-                    entries.Count == 0 ? "本地词典未找到释义" : string.Empty);
-                return entries.Count == 0;
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
-            return false;
+            return SearchWordAsync(text, LiteSearchResultWordItems, 10, request, debounce: false);
         }
 
         private async Task SearchPatternAsync(string pattern, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request)
@@ -177,22 +153,28 @@ namespace Flint3.ViewModels
                 IReadOnlyList<WordEntry> entries = await _wordQueryService.PatternAsync(pattern, limit, request.Token);
                 request.Token.ThrowIfCancellationRequested();
 
-                PublishResults(wordsCollection, entries, request.Sequence, string.Empty);
+                string hint = await EmptyResultHintAsync(pattern, entries.Count, request.Token);
+                PublishResults(wordsCollection, entries, request.Sequence, hint);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
         }
 
-        private async Task SearchWordAsync(string word, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request)
+        private async Task SearchWordAsync(string word, ObservableCollection<StarDictWordItem> wordsCollection, int limit, SearchRequest request, bool debounce = true)
         {
             try
             {
-                await Task.Delay(SearchDebounceMilliseconds, request.Token);
+                if (debounce)
+                {
+                    await Task.Delay(SearchDebounceMilliseconds, request.Token);
+                }
 
-                IReadOnlyList<WordEntry> entries = await _wordQueryService.MatchAsync(word, limit, request.Token);
+                bool reverseLookup = ChineseTermExtractor.TryNormalizeQuery(word, out _);
+                IReadOnlyList<WordEntry> entries = await _wordQueryService.LookupAsync(word, limit, reverseLookup, request.Token);
                 request.Token.ThrowIfCancellationRequested();
 
-                PublishResults(wordsCollection, entries, request.Sequence, EmptyResultHint(word, entries.Count));
+                string hint = await EmptyResultHintAsync(word, entries.Count, request.Token);
+                PublishResults(wordsCollection, entries, request.Sequence, hint);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
@@ -243,19 +225,26 @@ namespace Flint3.ViewModels
             }
         }
 
-        /// <summary>
-        /// 只为中文输入生成提示；英文查不到时保持原来的空列表+占位图，不额外打扰
-        /// </summary>
-        private static string EmptyResultHint(string word, int resultCount)
+        private async Task<string> EmptyResultHintAsync(string word, int resultCount, System.Threading.CancellationToken cancellationToken)
         {
-            if (resultCount > 0 || !ChineseTermExtractor.TryNormalizeQuery(word, out _))
+            if (resultCount > 0)
             {
                 return string.Empty;
             }
 
-            return StarDictDataAccess.ChineseLookupStatus == ChineseIndexStatus.Ready
-                ? "未找到对应的英文词"
-                : $"中文反查不可用：{StarDictDataAccess.ChineseLookupHint}";
+            if (!_hasImportedSources && !await StarDictDataAccess.IsDictionaryAvailableAsync(cancellationToken))
+            {
+                return "没有可用词库。请将 stardict.csf 放入程序的 Data 目录，或在设置中导入 MDX 词库。";
+            }
+
+            if (ChineseTermExtractor.TryNormalizeQuery(word, out _))
+            {
+                return StarDictDataAccess.ChineseLookupStatus == ChineseIndexStatus.Ready
+                    ? "未找到对应的英文词"
+                    : $"中文反查不可用：{StarDictDataAccess.ChineseLookupHint}";
+            }
+
+            return "本地词典未找到释义";
         }
 
         /// <summary>

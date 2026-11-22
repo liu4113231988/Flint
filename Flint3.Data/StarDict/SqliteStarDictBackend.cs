@@ -25,7 +25,11 @@ namespace Flint3.Data.StarDict
         /// </summary>
         private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
         {
-            SqliteConnection connection = new($"Filename={_databasePath}");
+            SqliteConnection connection = new(new SqliteConnectionStringBuilder
+            {
+                DataSource = _databasePath,
+                Mode = SqliteOpenMode.ReadOnly
+            }.ToString());
             try
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);

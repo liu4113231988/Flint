@@ -11,6 +11,20 @@ namespace Flint3.Core.Tests
     public class WordQueryServiceTests
     {
         [Fact]
+        public async Task LookupAsync_保留短语和同词异源释义_过滤排序邻词()
+        {
+            var first = new FakeWordSource("Ecdict", "take ... off", "take off", "take off from");
+            var second = new FakeWordSource("Professional", "take off");
+            using var service = new WordQueryService([first, second]);
+
+            var results = await service.LookupAsync(" take off ", 10, reverseLookup: false);
+
+            Assert.Equal(new[] { ("take off", "Ecdict"), ("take off", "Professional"), ("take off from", "Ecdict") },
+                results.Select(entry => (entry.Word, entry.Source)));
+            Assert.Empty(await service.LookupAsync("take ofx", 10, reverseLookup: false));
+        }
+
+        [Fact]
         public async Task MatchAsync_排序契约_精确优先于前缀_前缀优先于其他()
         {
             var source = new FakeWordSource("Ecdict", "appendix", "apple", "app", "banana");
@@ -202,7 +216,9 @@ namespace Flint3.Core.Tests
 
             public Task<IReadOnlyList<WordEntry>> QueryAsync(string word, CancellationToken cancellationToken = default)
             {
-                return Respond(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.FromResult<IReadOnlyList<WordEntry>>(_entries
+                    .Where(entry => string.Equals(entry.Word, word, StringComparison.OrdinalIgnoreCase)).ToArray());
             }
 
             public Task<IReadOnlyList<WordEntry>> MatchAsync(string word, int limit, CancellationToken cancellationToken = default)

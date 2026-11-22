@@ -61,6 +61,25 @@ namespace Flint3.Core.Query
             return Rank(merged, word);
         }
 
+        public async Task<IReadOnlyList<WordEntry>> LookupAsync(
+            string word, int limit, bool reverseLookup, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(word) || limit <= 0)
+            {
+                return [];
+            }
+
+            word = word.Trim();
+            List<WordEntry> exact = reverseLookup ? [] : await CollectAsync(
+                source => source.QueryAsync(word, cancellationToken), cancellationToken).ConfigureAwait(false);
+            List<WordEntry> candidates = await CollectAsync(
+                source => source.MatchAsync(word, limit, cancellationToken), cancellationToken).ConfigureAwait(false);
+            exact.AddRange(candidates.Where(entry => reverseLookup ||
+                entry.Word.StartsWith(word, StringComparison.OrdinalIgnoreCase)));
+
+            return exact.DistinctBy(entry => (entry.Word.ToUpperInvariant(), entry.Source)).ToArray();
+        }
+
         public async Task<IReadOnlyList<WordEntry>> PatternAsync(string pattern, int limit, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(pattern) || limit <= 0)

@@ -260,14 +260,14 @@ namespace Flint3.ViewModels
             if (!string.IsNullOrWhiteSpace(text) && IsCurrentSelection(version, owner))
             {
                 _selectionIcon ??= new SelectionIconWindow();
-                _selectionIcon.ShowAt(pointer, owner, () => ShowSelectionResult(text, translateOnMiss: true, anchor: pointer));
+                _selectionIcon.ShowAt(pointer, owner, () => ShowSelectionResult(text, anchor: pointer));
             }
         }
 
         private bool IsCurrentSelection(int version, HWND owner)
             => version == _selectionVersion && owner == PInvoke.GetForegroundWindow();
 
-        private void ShowSelectionResult(string? text, bool translateOnMiss = false, Point? anchor = null)
+        private void ShowSelectionResult(string? text, Point? anchor = null)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
@@ -276,7 +276,7 @@ namespace Flint3.ViewModels
             }
 
             App.ShowLiteWindow(atCursor: true, anchor: anchor);
-            App.FlintLiteWindow?.ShowCapturedText(text, translateOnMiss);
+            App.FlintLiteWindow?.ShowCapturedText(text);
         }
 
         /// <summary>

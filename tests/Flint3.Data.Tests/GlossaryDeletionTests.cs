@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Flint3.Data.Models;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -8,6 +9,26 @@ namespace Flint3.Data.Tests;
 
 public class GlossaryDeletionTests
 {
+    [Fact]
+    public async Task ImportedWordsWithNoEcdictIdAreCheckedBySpelling()
+    {
+        string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".db");
+        try
+        {
+            await GlossaryDataAccess.LoadDatabase(path);
+            await GlossaryDataAccess.AddGlossaryWord(0, 1, "take off", "", "", "起飞", "", "", GlossaryColorsEnum.Transparent);
+            Assert.True(await GlossaryDataAccess.CheckGlossaryContainsWord(0, "TAKE OFF", 1));
+            Assert.False(await GlossaryDataAccess.CheckGlossaryContainsWord(0, "land", 1));
+        }
+        finally
+        {
+            GlossaryDataAccess.CloseDatabase();
+            using var pooled = new SqliteConnection($"Filename={path}");
+            SqliteConnection.ClearPool(pooled);
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public async Task FailedDeletionRollsBackWordsAndCategory()
     {

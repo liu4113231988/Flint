@@ -522,16 +522,9 @@ namespace Flint3.ViewModels
         /// <param name="exchange"></param>
         /// <param name="description"></param>
         /// <param name="color"></param>
-        public async Task AddWordToMyGlossary(long wordid, int glossaryId, string word, string phonetic, string definition, string translation, string exchange, string description, GlossaryColorsEnum color)
+        public Task AddWordToMyGlossary(long wordid, int glossaryId, string word, string phonetic, string definition, string translation, string exchange, string description, GlossaryColorsEnum color)
         {
-            try
-            {
-                await GlossaryDataAccess.AddGlossaryWord(wordid, glossaryId, word, phonetic, definition, translation, exchange, description, color);
-            }
-            catch (Exception e)
-            {
-                System.Diagnostics.Trace.WriteLine(e.Message);
-            }
+            return GlossaryDataAccess.AddGlossaryWord(wordid, glossaryId, word, phonetic, definition, translation, exchange, description, color);
         }
 
         /// <summary>
@@ -600,7 +593,7 @@ namespace Flint3.ViewModels
             {
                 foreach (var item in this.MyGlossaries)
                 {
-                    if (!await GlossaryDataAccess.CheckGlossaryContainsWord(addingWordItem.Id, item.Id))
+                    if (!await GlossaryDataAccess.CheckGlossaryContainsWord(addingWordItem.Id, addingWordItem.Word, item.Id))
                     {
                         result.Add(item);
                     }

@@ -4,7 +4,7 @@
 
 - Windows 10 1809+ / Windows 11，x64
 - Visual Studio 2026（含 Windows SDK 10.0.26100，不再需要 C++ 工作负载）
-- .NET 10 SDK
+- .NET 10 SDK 10.0.404 或更新的 .NET 10 SDK，见仓库根目录的 `global.json`
 - 7-Zip（仅数据准备需要）
 
 ## 1. 准备词典数据

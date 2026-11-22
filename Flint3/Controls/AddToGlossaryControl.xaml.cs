@@ -70,6 +70,7 @@ namespace Flint3.Controls
         {
             try
             {
+                SaveError.Visibility = Visibility.Collapsed;
                 this.AddingWordItem = item;
                 this.AddingWordColor = GlossaryColorsEnum.Transparent;
                 WordColorScrollViewer?.ChangeView(0, 0, null, true);
@@ -145,12 +146,20 @@ namespace Flint3.Controls
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
         }
 
-        private void OnClickAddWord(object sender, RoutedEventArgs e)
+        private bool _savingWord;
+
+        private async void OnClickAddWord(object sender, RoutedEventArgs e)
         {
+            if (_savingWord || GlossaryComboBox.SelectedItem is not GlossaryMyModel glossary)
+            {
+                return;
+            }
+
+            _savingWord = true;
+            SaveError.Visibility = Visibility.Collapsed;
             try
             {
-                var glossary = GlossaryComboBox.SelectedItem as GlossaryMyModel;
-                _ = MainViewModel.Instance.AddWordToMyGlossary(
+                await MainViewModel.Instance.AddWordToMyGlossary(
                     this.AddingWordItem.Id,
                     glossary.Id,
                     this.AddingWordItem.Word,
@@ -163,7 +172,15 @@ namespace Flint3.Controls
 
                 _hideAddingFlyout?.Invoke();
             }
-            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                SaveError.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                _savingWord = false;
+            }
         }
 
         /// <summary>

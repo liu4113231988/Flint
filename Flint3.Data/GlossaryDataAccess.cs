@@ -322,23 +322,19 @@ namespace Flint3.Data
         /// <returns></returns>
         public static async Task AddGlossaryWord(long wordId, int glossaryId, string word, string phonetic, string definition, string translation, string exchange, string description, GlossaryColorsEnum color)
         {
-            try
-            {
-                using SqliteCommand insertCommand = new(
-                    $"INSERT INTO glossary(wordid,glossaryid,word,phonetic,definition,translation,exchange,description,color) VALUES($wordid,$glossaryid,$word,$phonetic,$definition,$translation,$exchange,$description,$color);",
-                    _glossaryDb);
-                insertCommand.Parameters.AddWithValue("$wordid", wordId);
-                insertCommand.Parameters.AddWithValue("$glossaryid", glossaryId);
-                insertCommand.Parameters.AddWithValue("$word", word);
-                insertCommand.Parameters.AddWithValue("$phonetic", phonetic);
-                insertCommand.Parameters.AddWithValue("$definition", definition);
-                insertCommand.Parameters.AddWithValue("$translation", translation);
-                insertCommand.Parameters.AddWithValue("$exchange", exchange);
-                insertCommand.Parameters.AddWithValue("$description", description);
-                insertCommand.Parameters.AddWithValue("$color", (int)color);
-                await insertCommand.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+            using SqliteCommand insertCommand = new(
+                $"INSERT INTO glossary(wordid,glossaryid,word,phonetic,definition,translation,exchange,description,color) VALUES($wordid,$glossaryid,$word,$phonetic,$definition,$translation,$exchange,$description,$color);",
+                _glossaryDb);
+            insertCommand.Parameters.AddWithValue("$wordid", wordId);
+            insertCommand.Parameters.AddWithValue("$glossaryid", glossaryId);
+            insertCommand.Parameters.AddWithValue("$word", word);
+            insertCommand.Parameters.AddWithValue("$phonetic", phonetic);
+            insertCommand.Parameters.AddWithValue("$definition", definition);
+            insertCommand.Parameters.AddWithValue("$translation", translation);
+            insertCommand.Parameters.AddWithValue("$exchange", exchange);
+            insertCommand.Parameters.AddWithValue("$description", description);
+            insertCommand.Parameters.AddWithValue("$color", (int)color);
+            await insertCommand.ExecuteNonQueryAsync();
         }
 
         /// <summary>
@@ -385,12 +381,15 @@ namespace Flint3.Data
         /// <param name="wordId">单词在StarDict中的ID</param>
         /// <param name="glossaryid">生词本ID</param>
         /// <returns></returns>
-        public static async Task<bool> CheckGlossaryContainsWord(long wordId, int glossaryid)
+        public static async Task<bool> CheckGlossaryContainsWord(long wordId, string word, int glossaryid)
         {
             try
             {
-                using SqliteCommand selectWordsCommand = new($"SELECT 1 FROM glossary WHERE wordid=$wordid AND glossaryid=$glossaryid;", _glossaryDb);
+                using SqliteCommand selectWordsCommand = new(
+                    "SELECT 1 FROM glossary WHERE glossaryid=$glossaryid AND wordid=$wordid AND ($wordid > 0 OR word=$word COLLATE NOCASE);",
+                    _glossaryDb);
                 selectWordsCommand.Parameters.AddWithValue("$wordid", wordId);
+                selectWordsCommand.Parameters.AddWithValue("$word", word);
                 selectWordsCommand.Parameters.AddWithValue("$glossaryid", glossaryid);
                 using SqliteDataReader wordsQuery = await selectWordsCommand.ExecuteReaderAsync();
                 return await wordsQuery.ReadAsync() == true;

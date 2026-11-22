@@ -49,12 +49,10 @@ namespace Flint3.Views
         }
 
         private string? _capturedText;
-        private int _captureVersion;
         private bool _settingCapturedText;
 
         internal void CancelPendingTranslation()
         {
-            _captureVersion++;
             ViewModel.ClearLiteTranslation();
         }
 
@@ -71,7 +69,7 @@ namespace Flint3.Views
             }
         }
 
-        internal async void ShowCapturedText(string text, bool translateOnMiss)
+        internal async void ShowCapturedText(string text)
         {
             _settingCapturedText = true;
             try
@@ -85,18 +83,11 @@ namespace Flint3.Views
 
             _capturedText = text;
             CancelPendingTranslation();
-            int version = _captureVersion;
-            if (await ViewModel.PreviewCapturedTextAsync(text)
-                && version == _captureVersion
-                && translateOnMiss && ViewModel.AppSettings.EnableAiTranslation)
-            {
-                await ViewModel.TranslateLiteTextAsync(text);
-            }
+            await ViewModel.PreviewCapturedTextAsync(text);
         }
 
         private async void OnClickTranslateOriginal(object sender, RoutedEventArgs e)
         {
-            _captureVersion++;
             await ViewModel.TranslateLiteTextAsync(_capturedText ?? SearchTextBox.Text);
         }
 

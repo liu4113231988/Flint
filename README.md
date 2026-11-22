@@ -19,6 +19,8 @@ Windows x64 便携版可从 [GitHub Releases](https://github.com/liu4113231988/F
 
 #### 功能状态
 
+作为有道词典的替代方案，燧石适合备好词库后的 Windows 离线阅读。手输和取词均优先显示原文精确释义，详见[桌面词典替代性评估与验收条件](docs/youdao-alternative-review.md)。
+
 - [x] 快捷键唤起窗口改为纯 C# 实现（不再依赖 C++/WinRT Interop），升级到 .NET 10
 - [x] AOT L1：`Flint3.Core`、`Flint3.Data` 可 NativeAOT 发布，UI 使用 CsWinRT AOT 优化（关闭 ReadyToRun，不裁剪）；整应用 NativeAOT（L2）不在本期范围
 - [x] 支持导入 mdx 词库：未加密 + zlib/无压缩 + UTF-8/UTF-16 纯文本词条。可在设置中调整导入词库的优先级。启停状态保存失败时，开关恢复原状并提示原因

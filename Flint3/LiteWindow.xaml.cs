@@ -81,9 +81,9 @@ namespace Flint3
         /// <summary>
         /// 回填搜索框文本（划词翻译），赋值触发 TextChanged 走既有查词链路
         /// </summary>
-        public void ShowCapturedText(string text, bool translateOnMiss)
+        public void ShowCapturedText(string text)
         {
-            FlintLitePage?.ShowCapturedText(text, translateOnMiss);
+            FlintLitePage?.ShowCapturedText(text);
         }
 
         /// <summary>

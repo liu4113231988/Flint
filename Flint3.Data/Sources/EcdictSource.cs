@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Flint3.Core.Query;
 using Flint3.Data.Chinese;
+using Flint3.Data.Csf;
 using Flint3.Data.Models;
 
 namespace Flint3.Data.Sources
@@ -32,7 +33,8 @@ namespace Flint3.Data.Sources
                 return Map(await StarDictDataAccess.MatchChineseWord(word, limit, cancellationToken).ConfigureAwait(false));
             }
 
-            return Map(await StarDictDataAccess.MatchWord(word, limit, cancellationToken).ConfigureAwait(false));
+            string key = CsfText.DeriveStripWord(word);
+            return key.Length == 0 ? [] : Map(await StarDictDataAccess.MatchWord(key, limit, cancellationToken).ConfigureAwait(false));
         }
 
         public async Task<IReadOnlyList<WordEntry>> PatternAsync(string pattern, int limit, CancellationToken cancellationToken = default)

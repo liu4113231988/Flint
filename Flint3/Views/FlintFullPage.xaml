@@ -156,6 +156,7 @@
                             </muxc:Expander.Header>
                             <muxc:Expander.Content>
                                 <StackPanel Orientation="Vertical">
+                                    <TextBlock Text="{x:Bind Source}" FontSize="12" Opacity="0.65"/>
                                     <Grid HorizontalAlignment="Stretch">
                                         <TextBlock Text="{x:Bind Translation}" Opacity="0.7" TextWrapping="Wrap" LineHeight="24" IsTextSelectionEnabled="True"/>
                                     </Grid>

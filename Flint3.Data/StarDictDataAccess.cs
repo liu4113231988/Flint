@@ -95,6 +95,20 @@ namespace Flint3.Data
             _chineseSourceVerified = false;
         }
 
+        public static async Task<bool> IsDictionaryAvailableAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await GetBackend().GetRecordCount(cancellationToken).ConfigureAwait(false) > 0;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                return false;
+            }
+        }
+
         private static IStarDictBackend GetBackend()
         {
             IStarDictBackend? backend = _backend;
